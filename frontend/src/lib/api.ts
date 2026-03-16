@@ -636,6 +636,19 @@ export async function createDirectory(dirPath: string, agentId?: string): Promis
   )
 }
 
+export async function updateFile(filePath: string, content: string, agentId?: string): Promise<FileEntry> {
+  const params = new URLSearchParams()
+  params.append('path', filePath)
+  if (agentId) params.append('agentId', agentId)
+  return fetchJSON<FileEntry>(
+    `/api/openclaw/filemanager/update?${params.toString()}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    },
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Skills marketplace (skills.sh)
 // ---------------------------------------------------------------------------

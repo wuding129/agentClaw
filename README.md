@@ -215,15 +215,6 @@ SkillClaw 的 **frameClaw** 多租户架构实现：
 
 这套架构设计可适配其他 Agent 引擎，未来可用于构建企业内部 Agent 平台等场景。
 
-## 致谢
-
-本项目基于以下优秀开源项目构建：
-
-| 项目 | 许可证 | 用途 |
-|------|--------|------|
-| OpenClaw | MIT | Agent 引擎（零侵入集成） |
-| nanobot | MIT | AI 助手框架参考 |
-
 ## License
 
 MIT

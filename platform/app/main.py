@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.db.engine import engine
 from app.db.models import Base
-from app.routes import auth, llm, proxy, admin, skills, notifications
+from app.routes import agents, auth, llm, proxy, admin, skills, notifications
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,86 @@ async def _ensure_database() -> None:
             logger.info("Database '%s' already exists", db_name)
     finally:
         await conn.close()
+
+
+async def _run_database_migrations() -> None:
+    """Auto-run database migrations on startup.
+
+    Checks for missing columns/indexes and adds them automatically.
+    This ensures schema is always up to date without manual intervention.
+    """
+    from sqlalchemy import text
+
+    async with engine.begin() as conn:
+        # Check if token_expires_at column exists using information_schema
+        result = await conn.execute(text("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'containers' AND column_name = 'token_expires_at'
+        """))
+        if result.scalar():
+            logger.debug("Column token_expires_at already exists")
+        else:
+            logger.info("Adding token_expires_at column to containers table...")
+            await conn.execute(text("""
+                ALTER TABLE containers
+                ADD COLUMN token_expires_at TIMESTAMP
+                DEFAULT NOW() + INTERVAL '30 days'
+            """))
+            logger.info("Added token_expires_at column successfully")
+
+        # Check if index exists on usage_records.created_at
+        result = await conn.execute(text("""
+            SELECT 1 FROM pg_indexes
+            WHERE indexname = 'ix_usage_records_created_at'
+        """))
+        if result.scalar():
+            logger.debug("Index ix_usage_records_created_at already exists")
+        else:
+            logger.info("Adding index on usage_records.created_at...")
+            await conn.execute(text("""
+                CREATE INDEX ix_usage_records_created_at ON usage_records(created_at)
+            """))
+            logger.info("Added index successfully")
+
+        # Migration: Rename containers.user_id to containers.agent_id
+        result = await conn.execute(text("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'containers' AND column_name = 'agent_id'
+        """))
+        if not result.scalar():
+            logger.info("Renaming containers.user_id to containers.agent_id...")
+            await conn.execute(text("""
+                ALTER TABLE containers RENAME COLUMN user_id TO agent_id
+            """))
+            logger.info("Renamed column successfully")
+
+        # Migration: Create user_agents table
+        result = await conn.execute(text("""
+            SELECT 1 FROM information_schema.tables
+            WHERE table_name = 'user_agents'
+        """))
+        if not result.scalar():
+            logger.info("Creating user_agents table...")
+            await conn.execute(text("""
+                CREATE TABLE user_agents (
+                    id VARCHAR(36) PRIMARY KEY,
+                    user_id VARCHAR(36) NOT NULL,
+                    openclaw_agent_id VARCHAR(128) NOT NULL UNIQUE,
+                    name VARCHAR(128) NOT NULL,
+                    description TEXT DEFAULT '',
+                    is_default BOOLEAN DEFAULT FALSE,
+                    soul_md TEXT DEFAULT '',
+                    status VARCHAR(16) DEFAULT 'active',
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """))
+            await conn.execute(text("""
+                CREATE INDEX ix_user_agents_user_id ON user_agents(user_id)
+            """))
+            logger.info("Created user_agents table successfully")
+
+        # Future migrations can be added here following the same pattern
 
 
 async def _cleanup_temp_skill_submissions() -> None:
@@ -157,6 +237,9 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database tables verified")
 
+    # Run automatic database migrations
+    await _run_database_migrations()
+
     # Sync platform skills from filesystem to database
     await _sync_platform_skills()
 
@@ -257,6 +340,7 @@ app.add_middleware(
 
 # Mount route groups
 app.include_router(auth.router)
+app.include_router(agents.router)
 app.include_router(llm.router)
 app.include_router(proxy.router)
 app.include_router(admin.router)

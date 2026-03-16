@@ -17,9 +17,22 @@ from app.auth.dependencies import get_current_user
 from app.config import settings
 from app.container.shared_manager import ensure_shared_container
 from app.db.engine import async_session, get_db
-from app.db.models import User
+from app.db.models import User, UserAgent
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
+
+
+async def _get_default_agent(db: AsyncSession, user_id: str) -> UserAgent | None:
+    """Get the user's default agent."""
+    result = await db.execute(
+        select(UserAgent).where(
+            UserAgent.user_id == user_id,
+            UserAgent.is_default == True,
+            UserAgent.status == "active",
+        )
+    )
+    return result.scalar_one_or_none()
 
 
 def _sign_is_admin(agent_id: str, is_admin: bool) -> str:
@@ -90,6 +103,15 @@ async def proxy_http(
                     detail="Admin access required",
                 )
 
+    # Get user's default agent for routing
+    user_agent = await _get_default_agent(db, user.id)
+    if user_agent is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No default agent found. Please create an agent first.",
+        )
+    agent_id = user_agent.openclaw_agent_id
+
     base_url = await _shared_instance_url()
     # Close the session explicitly so the connection returns to the pool
     # before the potentially long upstream call (up to 120s).
@@ -114,10 +136,10 @@ async def proxy_http(
                 content=body,
                 headers={
                     "content-type": request.headers.get("content-type", "application/json"),
-                    # Add agentId header for multi-agent routing (use uppercase to match Bridge)
-                    "X-Agent-Id": user.id,
+                    # Add agentId header for multi-agent routing (use openclaw_agent_id)
+                    "X-Agent-Id": agent_id,
                     # Sign agentId to prevent tampering
-                    "X-Agent-Id-Sig": _sign_agent_id(user.id),
+                    "X-Agent-Id-Sig": _sign_agent_id(agent_id),
                     # Add admin flag for admin users
                     "X-Is-Admin": "true" if user.role == "admin" else "false",
                     # Forward authorization header for bridge authentication
@@ -166,8 +188,14 @@ async def proxy_websocket(
             await websocket.close(code=4001, reason="User not found")
             return
 
-        # Store user info for agent routing
-        user_id = user.id
+        # Get user's default agent for routing
+        user_agent = await _get_default_agent(db, user.id)
+        if user_agent is None:
+            await websocket.close(code=4001, reason="No default agent found")
+            return
+
+        # Store info for agent routing
+        agent_id = user_agent.openclaw_agent_id
         is_admin = user.role == "admin"
 
         if settings.dev_gateway_url:
@@ -186,9 +214,9 @@ async def proxy_websocket(
         # Add agentId and isAdmin query parameters for multi-agent routing
         # Sign isAdmin to prevent tampering
         admin_param = "true" if is_admin else "false"
-        is_admin_sig = _sign_is_admin(user_id, is_admin)
+        is_admin_sig = _sign_is_admin(agent_id, is_admin)
         sep = "&" if "?" in target_ws_url else "?"
-        target_ws_url = f"{target_ws_url}{sep}agentId={user_id}&isAdmin={admin_param}&isAdminSig={is_admin_sig}"
+        target_ws_url = f"{target_ws_url}{sep}agentId={agent_id}&isAdmin={admin_param}&isAdminSig={is_admin_sig}"
     # DB session is now released — not held during long-lived WebSocket relay
 
     import asyncio

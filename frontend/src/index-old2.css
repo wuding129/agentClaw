@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+/*
+ * Modern Glassmorphism Dark Theme
+ * 特点：层次丰富、微光边框、柔和渐变
+ */
+
+@theme {
+  /* 基础背景层 - 从深到浅 */
+  --color-bg-base: #0a0f1a;           /* 最深背景 */
+  --color-bg-elevated: #111827;       /* 主背景 */
+  --color-bg-surface: #1a2235;        /* 卡片背景 */
+  --color-bg-floating: #242b3d;       /* 悬浮层 */
+
+  /* 边框 - 极简设计，几乎不可见 */
+  --color-border-subtle: rgba(255, 255, 255, 0.015);
+  --color-border-default: rgba(255, 255, 255, 0.025);
+  --color-border-hover: rgba(255, 255, 255, 0.06);
+  --color-border-accent: rgba(99, 102, 241, 0.15);
+
+  /* 文字 - 增加层级 */
+  --color-text-primary: #f8fafc;      /* 标题 */
+  --color-text-secondary: #94a3b8;    /* 正文 */
+  --color-text-tertiary: #64748b;     /* 辅助 */
+  --color-text-muted: #475569;        /* 禁用 */
+
+  /* 强调色 - 更有质感 */
+  /* 主蓝色 - 带点紫调的科技蓝 */
+  --color-accent-blue: #6366f1;
+  --color-accent-blue-light: #818cf8;
+  --color-accent-blue-dark: #4f46e5;
+  --color-accent-blue-glow: rgba(99, 102, 241, 0.3);
+
+  /* 成功绿 - 翡翠绿 */
+  --color-accent-green: #10b981;
+  --color-accent-green-light: #34d399;
+  --color-accent-green-glow: rgba(16, 185, 129, 0.3);
+
+  /* 警告黄 - 琥珀 */
+  --color-accent-yellow: #f59e0b;
+  --color-accent-yellow-light: #fbbf24;
+
+  /* 错误红 - 玫瑰 */
+  --color-accent-red: #f43f5e;
+  --color-accent-red-light: #fb7185;
+  --color-accent-red-glow: rgba(244, 63, 94, 0.3);
+
+  /* 紫色 - 用于 AI/特殊功能 */
+  --color-accent-purple: #a855f7;
+  --color-accent-purple-light: #c084fc;
+  --color-accent-purple-glow: rgba(168, 85, 247, 0.3);
+
+  /* 渐变 */
+  --gradient-sidebar: linear-gradient(180deg, #111827 0%, #0a0f1a 100%);
+  --gradient-card: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+  --gradient-glow-blue: radial-gradient(ellipse at top, rgba(99, 102, 241, 0.15), transparent 50%);
+  --gradient-glow-purple: radial-gradient(ellipse at top, rgba(168, 85, 247, 0.1), transparent 50%);
+}
+
+/* 基础样式 */
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg-base);
+  color: var(--color-text-secondary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  line-height: 1.6;
+}
+
+/* 滚动条 - 更精致 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* 选中文本 */
+::selection {
+  background: rgba(99, 102, 241, 0.3);
+  color: var(--color-text-primary);
+}
+
+/* 动画 */
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px var(--color-accent-blue-glow); }
+  50% { box-shadow: 0 0 30px var(--color-accent-blue-glow); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}

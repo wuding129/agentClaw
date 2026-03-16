@@ -231,14 +231,14 @@ export default function SkillStore() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-dark-text">技能商店</h1>
-        <p className="mt-1 text-sm text-dark-text-secondary">
+        <h1 className="text-2xl font-bold text-text-primary">技能商店</h1>
+        <p className="mt-1 text-sm text-text-secondary">
           发现、安装和管理 AI 技能扩展
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 flex gap-1 rounded-lg bg-dark-card p-1 border border-dark-border">
+      <div className="mb-6 flex gap-1 rounded-lg bg-bg-surface p-1 border border-border-default">
         {tabs.map(t => (
           <button
             key={t.key}
@@ -246,7 +246,7 @@ export default function SkillStore() {
             className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
               tab === t.key
                 ? 'bg-accent-blue text-white'
-                : 'text-dark-text-secondary hover:text-dark-text hover:bg-dark-bg'
+                : 'text-text-secondary hover:text-text-primary hover:bg-bg-base'
             }`}
           >
             {t.label}
@@ -271,7 +271,7 @@ export default function SkillStore() {
               <Loader2 size={24} className="animate-spin text-accent-blue" />
             </div>
           ) : curated.length === 0 ? (
-            <div className="rounded-xl border border-dark-border bg-dark-card p-8 text-center text-sm text-dark-text-secondary">
+            <div className="rounded-xl border border-border-default bg-bg-surface p-8 text-center text-sm text-text-secondary shadow-card">
               暂无精选技能
             </div>
           ) : (
@@ -281,7 +281,7 @@ export default function SkillStore() {
                 return (
                   <div
                     key={skill.id}
-                    className="rounded-xl border border-dark-border bg-dark-card p-5 hover:border-accent-blue/30 transition-colors"
+                    className="rounded-xl border border-border-default bg-bg-surface p-5 hover:border-accent-blue/30 transition-colors shadow-card"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent-blue/10">
@@ -295,12 +295,12 @@ export default function SkillStore() {
                         <span className="rounded bg-accent-yellow/10 px-2 py-0.5 text-xs text-accent-yellow">推荐</span>
                       )}
                     </div>
-                    <h3 className="mt-3 text-sm font-semibold text-dark-text">{skill.name}</h3>
-                    <p className="mt-1 text-xs text-dark-text-secondary leading-relaxed line-clamp-2">{skill.description}</p>
+                    <h3 className="mt-3 text-sm font-semibold text-text-primary">{skill.name}</h3>
+                    <p className="mt-1 text-xs text-text-secondary leading-relaxed line-clamp-2">{skill.description}</p>
                     <div className="mt-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-xs text-dark-text-secondary">
+                      <div className="flex items-center gap-2 text-xs text-text-secondary">
                         {skill.author && <span>{skill.author}</span>}
-                        <span className="rounded bg-dark-bg px-1.5 py-0.5">{skill.category}</span>
+                        <span className="rounded bg-bg-base px-1.5 py-0.5">{skill.category}</span>
                         <span>{skill.install_count} 次安装</span>
                       </div>
                     </div>
@@ -330,7 +330,7 @@ export default function SkillStore() {
           {/* Submit skill section */}
           <div className="mt-8">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold text-dark-text">提交技能</h2>
+              <h2 className="text-base font-semibold text-text-primary">提交技能</h2>
               <button
                 onClick={() => setShowSubmit(!showSubmit)}
                 className="flex items-center gap-1.5 text-sm text-accent-blue hover:text-accent-blue/80"
@@ -341,44 +341,44 @@ export default function SkillStore() {
             </div>
 
             {showSubmit && (
-              <form onSubmit={handleSubmitSkill} className="rounded-xl border border-dark-border bg-dark-card p-5 space-y-3">
+              <form onSubmit={handleSubmitSkill} className="rounded-xl border border-border-default bg-bg-surface p-5 space-y-3 shadow-card">
                 <div>
-                  <label className="block text-xs font-medium text-dark-text-secondary mb-1">技能名称 *</label>
+                  <label className="block text-xs font-medium text-text-secondary mb-1">技能名称 *</label>
                   <input
                     type="text"
                     value={submitName}
                     onChange={e => setSubmitName(e.target.value)}
                     placeholder="例如: web-scraper"
-                    className="w-full rounded-lg border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text outline-none focus:border-accent-blue"
+                    className="w-full rounded-lg border border-border-default bg-bg-base px-3 py-2 text-sm text-text-primary outline-none focus:border-accent-blue"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-dark-text-secondary mb-1">描述</label>
+                  <label className="block text-xs font-medium text-text-secondary mb-1">描述</label>
                   <textarea
                     value={submitDesc}
                     onChange={e => setSubmitDesc(e.target.value)}
                     placeholder="简要描述技能功能"
                     rows={2}
-                    className="w-full rounded-lg border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text outline-none focus:border-accent-blue resize-none"
+                    className="w-full rounded-lg border border-border-default bg-bg-base px-3 py-2 text-sm text-text-primary outline-none focus:border-accent-blue resize-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-dark-text-secondary mb-1">来源链接（可选）</label>
+                  <label className="block text-xs font-medium text-text-secondary mb-1">来源链接（可选）</label>
                   <input
                     type="text"
                     value={submitUrl}
                     onChange={e => setSubmitUrl(e.target.value)}
                     placeholder="GitHub/GitLab 仓库地址"
-                    className="w-full rounded-lg border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text outline-none focus:border-accent-blue"
+                    className="w-full rounded-lg border border-border-default bg-bg-base px-3 py-2 text-sm text-text-primary outline-none focus:border-accent-blue"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-dark-text-secondary mb-1">或上传技能包（ZIP）</label>
+                  <label className="block text-xs font-medium text-text-secondary mb-1">或上传技能包（ZIP）</label>
                   <input
                     type="file"
                     accept=".zip"
                     onChange={e => setSubmitFile(e.target.files?.[0] || null)}
-                    className="w-full rounded-lg border border-dark-border bg-dark-bg px-3 py-2 text-sm text-dark-text file:mr-2 file:px-2 file:rounded file:border-0 file:bg-accent-blue file:text-white file:text-xs file:cursor-pointer"
+                    className="w-full rounded-lg border border-border-default bg-bg-base px-3 py-2 text-sm text-text-primary file:mr-2 file:px-2 file:rounded file:border-0 file:bg-accent-blue file:text-white file:text-xs file:cursor-pointer"
                   />
                   {submitFile && (
                     <div className="mt-1 text-xs text-accent-blue">
@@ -400,15 +400,15 @@ export default function SkillStore() {
             {/* My submissions */}
             {submissions.length > 0 && (
               <div className="mt-4 space-y-2">
-                <h3 className="text-sm font-medium text-dark-text-secondary">我的提交</h3>
+                <h3 className="text-sm font-medium text-text-secondary">我的提交</h3>
                 {submissions.map(s => {
                   const aiResult = s.ai_review_result
                   return (
-                    <div key={s.id} className="rounded-lg border border-dark-border bg-dark-card px-4 py-3">
+                    <div key={s.id} className="rounded-lg border border-border-default bg-bg-surface px-4 py-3 shadow-card">
                       <div className="flex items-center justify-between">
                         <div>
-                          <span className="text-sm text-dark-text">{s.skill_name}</span>
-                          {s.description && <span className="ml-2 text-xs text-dark-text-secondary">{s.description}</span>}
+                          <span className="text-sm text-text-primary">{s.skill_name}</span>
+                          {s.description && <span className="ml-2 text-xs text-text-secondary">{s.description}</span>}
                         </div>
                         <div className="flex items-center gap-2">
                           {aiResult && (
@@ -429,26 +429,26 @@ export default function SkillStore() {
                         </div>
                       </div>
                       {aiResult && aiResult.issues && aiResult.issues.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-dark-border/50">
-                          <p className="text-xs text-dark-text-secondary mb-1">AI审核建议：</p>
+                        <div className="mt-2 pt-2 border-t border-border-default/50">
+                          <p className="text-xs text-text-secondary mb-1">AI审核建议：</p>
                           <ul className="space-y-1">
                             {aiResult.issues.slice(0, 2).map((issue, idx) => (
-                              <li key={idx} className="text-xs text-dark-text-secondary">
-                                <span className={issue.severity === 'critical' ? 'text-accent-red' : issue.severity === 'major' ? 'text-accent-yellow' : 'text-dark-text-secondary'}>
+                              <li key={idx} className="text-xs text-text-secondary">
+                                <span className={issue.severity === 'critical' ? 'text-accent-red' : issue.severity === 'major' ? 'text-accent-yellow' : 'text-text-secondary'}>
                                   [{issue.severity === 'critical' ? '关键' : issue.severity === 'major' ? '重要' : '建议'}]
                                 </span>{' '}
                                 {issue.message}
                               </li>
                             ))}
                             {aiResult.issues.length > 2 && (
-                              <li className="text-xs text-dark-text-secondary">...还有 {aiResult.issues.length - 2} 条建议</li>
+                              <li className="text-xs text-text-secondary">...还有 {aiResult.issues.length - 2} 条建议</li>
                             )}
                           </ul>
                         </div>
                       )}
                       {s.admin_notes && (
-                        <div className="mt-2 pt-2 border-t border-dark-border/50">
-                          <p className="text-xs text-dark-text-secondary">管理员备注: {s.admin_notes}</p>
+                        <div className="mt-2 pt-2 border-t border-border-default/50">
+                          <p className="text-xs text-text-secondary">管理员备注: {s.admin_notes}</p>
                         </div>
                       )}
                     </div>
@@ -464,7 +464,7 @@ export default function SkillStore() {
       {tab === 'platform' && (
         <div>
           <div className="mb-4 rounded-lg border border-accent-blue/20 bg-accent-blue/5 px-4 py-3">
-            <p className="text-sm text-dark-text">
+            <p className="text-sm text-text-primary">
               <Package size={14} className="inline mr-1.5 text-accent-blue" />
               平台技能是系统内置的技能，可直接复制到你的 workspace 进行自定义修改。
             </p>
@@ -474,7 +474,7 @@ export default function SkillStore() {
               <Loader2 size={24} className="animate-spin text-accent-blue" />
             </div>
           ) : platformSkills.length === 0 ? (
-            <div className="rounded-xl border border-dark-border bg-dark-card p-8 text-center text-sm text-dark-text-secondary">
+            <div className="rounded-xl border border-border-default bg-bg-surface p-8 text-center text-sm text-text-secondary shadow-card">
               暂无平台技能
             </div>
           ) : (
@@ -485,7 +485,7 @@ export default function SkillStore() {
                 return (
                   <div
                     key={skill.name}
-                    className="rounded-xl border border-dark-border bg-dark-card p-5 hover:border-accent-blue/30 transition-colors"
+                    className="rounded-xl border border-border-default bg-bg-surface p-5 hover:border-accent-blue/30 transition-colors shadow-card"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent-blue/10">
@@ -493,8 +493,8 @@ export default function SkillStore() {
                       </div>
                       <span className="rounded bg-accent-blue/10 px-2 py-0.5 text-xs text-accent-blue">平台内置</span>
                     </div>
-                    <h3 className="mt-3 text-sm font-semibold text-dark-text">{skill.name}</h3>
-                    <p className="mt-1 text-xs text-dark-text-secondary leading-relaxed line-clamp-2">{skill.description}</p>
+                    <h3 className="mt-3 text-sm font-semibold text-text-primary">{skill.name}</h3>
+                    <p className="mt-1 text-xs text-text-secondary leading-relaxed line-clamp-2">{skill.description}</p>
                     <button
                       onClick={() => handleCopySkill(skill.name)}
                       disabled={isCopying || isInstalled}
@@ -521,14 +521,14 @@ export default function SkillStore() {
       {tab === 'search' && (
         <div>
           <form onSubmit={handleSearch} className="mb-6 flex gap-3">
-            <div className="flex flex-1 items-center gap-2 rounded-lg border border-dark-border bg-dark-card px-4 py-2.5">
-              <Search size={16} className="text-dark-text-secondary" />
+            <div className="flex flex-1 items-center gap-2 rounded-lg border border-border-default bg-bg-surface px-4 py-2.5 shadow-card">
+              <Search size={16} className="text-text-secondary" />
               <input
                 type="text"
                 placeholder="搜索技能，例如：web scraping, react, testing..."
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                className="flex-1 bg-transparent text-sm text-dark-text outline-none placeholder:text-dark-text-secondary"
+                className="flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-tertiary"
               />
             </div>
             <button
@@ -541,23 +541,23 @@ export default function SkillStore() {
             </button>
           </form>
 
-          <p className="mb-4 text-xs text-dark-text-secondary">
+          <p className="mb-4 text-xs text-text-secondary">
             搜索来自 <a href="https://skills.sh/" target="_blank" rel="noreferrer" className="text-accent-blue hover:underline">skills.sh</a> 的技能
           </p>
 
           {searched && (
             <div>
-              <h2 className="mb-3 text-base font-semibold text-dark-text">
+              <h2 className="mb-3 text-base font-semibold text-text-primary">
                 搜索结果
-                {results.length > 0 && <span className="ml-2 text-sm font-normal text-dark-text-secondary">({results.length} 个技能)</span>}
+                {results.length > 0 && <span className="ml-2 text-sm font-normal text-text-secondary">({results.length} 个技能)</span>}
               </h2>
               {searching ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 size={24} className="animate-spin text-accent-blue" />
-                  <span className="ml-3 text-sm text-dark-text-secondary">正在搜索...</span>
+                  <span className="ml-3 text-sm text-text-secondary">正在搜索...</span>
                 </div>
               ) : results.length === 0 ? (
-                <div className="rounded-xl border border-dark-border bg-dark-card p-8 text-center text-sm text-dark-text-secondary">
+                <div className="rounded-xl border border-border-default bg-bg-surface p-8 text-center text-sm text-text-secondary shadow-card">
                   未找到相关技能，请尝试其他关键词
                 </div>
               ) : (
@@ -566,11 +566,11 @@ export default function SkillStore() {
                     const isInstalled = installed.has(r.slug)
                     const isInstalling = installing === r.slug
                     return (
-                      <div key={r.slug} className="flex items-center justify-between rounded-xl border border-dark-border bg-dark-card px-5 py-3.5 hover:border-accent-blue/30 transition-colors">
+                      <div key={r.slug} className="flex items-center justify-between rounded-xl border border-border-default bg-bg-surface px-5 py-3.5 hover:border-accent-blue/30 transition-colors shadow-card">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-dark-text truncate">{r.slug}</span>
-                            <span className="shrink-0 rounded bg-dark-bg px-2 py-0.5 text-xs text-dark-text-secondary">{r.installs}</span>
+                            <span className="text-sm font-medium text-text-primary truncate">{r.slug}</span>
+                            <span className="shrink-0 rounded bg-bg-base px-2 py-0.5 text-xs text-text-secondary">{r.installs}</span>
                           </div>
                           <a
                             href={r.url}
@@ -612,16 +612,16 @@ export default function SkillStore() {
       {/* ===== Installed Tab ===== */}
       {tab === 'installed' && (
         <div>
-          <h2 className="mb-3 text-base font-semibold text-dark-text">
+          <h2 className="mb-3 text-base font-semibold text-text-primary">
             已安装技能
-            {skills.length > 0 && <span className="ml-2 text-sm font-normal text-dark-text-secondary">({skills.filter(s => s.compatible !== false).length} 可用 / {skills.length} 总计)</span>}
+            {skills.length > 0 && <span className="ml-2 text-sm font-normal text-text-secondary">({skills.filter(s => s.compatible !== false).length} 可用 / {skills.length} 总计)</span>}
           </h2>
           {loadingSkills ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 size={24} className="animate-spin text-accent-blue" />
             </div>
           ) : skills.length === 0 ? (
-            <div className="rounded-xl border border-dark-border bg-dark-card p-8 text-center text-sm text-dark-text-secondary">
+            <div className="rounded-xl border border-border-default bg-bg-surface p-8 text-center text-sm text-text-secondary shadow-card">
               暂无已安装技能，前往"精选推荐"或"商店搜索"安装
             </div>
           ) : (
@@ -634,21 +634,21 @@ export default function SkillStore() {
                   return (
                     <div
                       key={skill.name}
-                      className={`rounded-xl border bg-dark-card p-5 transition-colors ${
+                      className={`rounded-xl border bg-bg-surface p-5 transition-colors shadow-card ${
                         isDisabled
-                          ? 'border-dark-border/50 opacity-60'
-                          : 'border-dark-border hover:border-accent-blue/30'
+                          ? 'border-border-default/50 opacity-60'
+                          : 'border-border-default hover:border-accent-blue/30'
                       }`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent-yellow/10">
-                          <Zap size={20} className={isDisabled ? 'text-dark-text-secondary' : 'text-accent-yellow'} />
+                          <Zap size={20} className={isDisabled ? 'text-text-secondary' : 'text-accent-yellow'} />
                         </div>
                         <button
                           onClick={() => handleToggle(skill)}
                           disabled={isToggling}
                           className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                            isDisabled ? 'bg-dark-border' : 'bg-accent-green'
+                            isDisabled ? 'bg-border-default' : 'bg-accent-green'
                           } ${isToggling ? 'opacity-50' : 'cursor-pointer'}`}
                           title={isDisabled ? '点击启用' : '点击禁用'}
                         >
@@ -659,11 +659,11 @@ export default function SkillStore() {
                           />
                         </button>
                       </div>
-                      <h3 className="mt-3 text-sm font-semibold text-dark-text">{skill.name}</h3>
-                      <p className="mt-1 text-xs text-dark-text-secondary leading-relaxed line-clamp-2">{skill.description}</p>
+                      <h3 className="mt-3 text-sm font-semibold text-text-primary">{skill.name}</h3>
+                      <p className="mt-1 text-xs text-text-secondary leading-relaxed line-clamp-2">{skill.description}</p>
                       <div className="mt-3 flex items-center justify-between">
                         {skill.source && (
-                          <span className="text-xs text-dark-text-secondary">
+                          <span className="text-xs text-text-secondary">
                             来源: {skill.source}
                           </span>
                         )}
@@ -674,13 +674,13 @@ export default function SkillStore() {
                       {/* Submit to curated - hide if already submitted or approved */}
                       {!submissions.some(s => s.skill_name === skill.name && ['pending', 'ai_reviewed', 'approved'].includes(s.status)) && (
                         showSubmitFromInstalled === skill.name ? (
-                          <div className="mt-3 pt-3 border-t border-dark-border/50 space-y-2">
+                          <div className="mt-3 pt-3 border-t border-border-default/50 space-y-2">
                             <textarea
                               value={submitFromInstalledDesc}
                               onChange={e => setSubmitFromInstalledDesc(e.target.value)}
                               placeholder="简要描述这个技能的功能..."
                               rows={2}
-                              className="w-full rounded-lg border border-dark-border bg-dark-bg px-2 py-1.5 text-xs text-dark-text outline-none focus:border-accent-blue resize-none"
+                              className="w-full rounded-lg border border-border-default bg-bg-base px-2 py-1.5 text-xs text-text-primary outline-none focus:border-accent-blue resize-none"
                             />
                             <div className="flex gap-2">
                               <button
@@ -692,7 +692,7 @@ export default function SkillStore() {
                               </button>
                               <button
                                 onClick={() => { setShowSubmitFromInstalled(null); setSubmitFromInstalledDesc('') }}
-                                className="flex-1 rounded bg-dark-border/30 text-dark-text-secondary text-xs py-1.5 hover:bg-dark-border/50"
+                                className="flex-1 rounded bg-border-default/30 text-text-secondary text-xs py-1.5 hover:bg-border-default/50"
                               >
                                 取消
                               </button>
@@ -716,26 +716,26 @@ export default function SkillStore() {
               {/* Incompatible skills */}
               {skills.filter(s => s.compatible === false).length > 0 && (
                 <details className="mt-6">
-                  <summary className="cursor-pointer text-sm text-dark-text-secondary hover:text-dark-text">
+                  <summary className="cursor-pointer text-sm text-text-secondary hover:text-text-primary">
                     <span className="ml-1">不兼容的技能 ({skills.filter(s => s.compatible === false).length}) — 这些技能需要 macOS/iOS 或缺少依赖</span>
                   </summary>
                   <div className="mt-3 grid grid-cols-3 gap-4">
                     {skills.filter(s => s.compatible === false).map(skill => (
                       <div
                         key={skill.name}
-                        className="rounded-xl border border-dark-border/30 bg-dark-card p-5 opacity-40"
+                        className="rounded-xl border border-border-default/30 bg-bg-surface p-5 opacity-40 shadow-card"
                       >
                         <div className="flex items-start justify-between">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-dark-border/20">
-                            <AlertTriangle size={20} className="text-dark-text-secondary" />
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-border-default/20">
+                            <AlertTriangle size={20} className="text-text-secondary" />
                           </div>
-                          <span className="rounded bg-dark-border/30 px-2 py-0.5 text-xs text-dark-text-secondary">不兼容</span>
+                          <span className="rounded bg-border-default/30 px-2 py-0.5 text-xs text-text-secondary">不兼容</span>
                         </div>
-                        <h3 className="mt-3 text-sm font-semibold text-dark-text">{skill.name}</h3>
-                        <p className="mt-1 text-xs text-dark-text-secondary leading-relaxed line-clamp-2">{skill.description}</p>
+                        <h3 className="mt-3 text-sm font-semibold text-text-primary">{skill.name}</h3>
+                        <p className="mt-1 text-xs text-text-secondary leading-relaxed line-clamp-2">{skill.description}</p>
                         <div className="mt-3">
                           {skill.source && (
-                            <span className="text-xs text-dark-text-secondary">来源: {skill.source}</span>
+                            <span className="text-xs text-text-secondary">来源: {skill.source}</span>
                           )}
                         </div>
                       </div>

@@ -16,10 +16,12 @@ import {
   uploadFile,
   deleteFile,
   createDirectory,
+  updateFile,
   listAgentWorkspaces,
   getMe,
 } from '../lib/api'
 import type { FileEntry, BrowseResult, AgentWorkspace, AuthUser } from '../lib/api'
+import { Pencil, Save, X } from 'lucide-react'
 
 export default function FileManager() {
   const [currentPath, setCurrentPath] = useState('')
@@ -30,9 +32,13 @@ export default function FileManager() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [showNewFolder, setShowNewFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
-  const [previewFile, setPreviewFile] = useState<{ name: string; content: string } | null>(null)
+  const [previewFile, setPreviewFile] = useState<{ name: string; content: string; path: string } | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editContent, setEditContent] = useState('')
+  const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Admin agent selection
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -158,21 +164,60 @@ export default function FileManager() {
   const handlePreview = async (entry: FileEntry) => {
     if (previewFile?.name === entry.name) {
       setPreviewFile(null)
+      setIsEditing(false)
+      setEditContent('')
       return
     }
     setPreviewLoading(true)
+    setIsEditing(false)
+    setEditContent('')
     try {
       const res = await browseFiles(entry.path, selectedAgentId || undefined)
       const fileRes = res as any
       if (fileRes.content !== undefined) {
-        setPreviewFile({ name: entry.name, content: fileRes.content })
+        setPreviewFile({ name: entry.name, content: fileRes.content, path: entry.path })
+        setEditContent(fileRes.content)
       } else {
-        setPreviewFile({ name: entry.name, content: '(二进制文件，无法预览)' })
+        setPreviewFile({ name: entry.name, content: '(二进制文件，无法预览)', path: entry.path })
+        setEditContent('')
       }
     } catch {
-      setPreviewFile({ name: entry.name, content: '(无法加载文件内容)' })
+      setPreviewFile({ name: entry.name, content: '(无法加载文件内容)', path: entry.path })
+      setEditContent('')
     } finally {
       setPreviewLoading(false)
+    }
+  }
+
+  const handleEdit = () => {
+    if (!previewFile || previewFile.content.startsWith('(')) return
+    setIsEditing(true)
+    setEditContent(previewFile.content)
+    // Focus textarea after rendering
+    setTimeout(() => editTextareaRef.current?.focus(), 0)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    if (previewFile) {
+      setEditContent(previewFile.content)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!previewFile || !isEditing) return
+    setSaving(true)
+    setError('')
+    try {
+      await updateFile(previewFile.path, editContent, selectedAgentId || undefined)
+      setPreviewFile({ ...previewFile, content: editContent })
+      setIsEditing(false)
+      // Refresh file list to show updated size/time
+      await loadDir(currentPath)
+    } catch (err: any) {
+      setError(err?.message || '保存失败')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -405,10 +450,51 @@ export default function FileManager() {
                             <Loader2 size={14} className="animate-spin" />
                             加载中...
                           </div>
+                        ) : isEditing ? (
+                          <div className="space-y-3">
+                            <textarea
+                              ref={editTextareaRef}
+                              value={editContent}
+                              onChange={(e) => setEditContent(e.target.value)}
+                              className="w-full h-80 rounded-lg bg-dark-bg border border-dark-border p-4 text-xs text-dark-text leading-relaxed font-mono resize-none focus:border-accent-blue focus:outline-none"
+                              spellCheck={false}
+                            />
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={handleSave}
+                                disabled={saving}
+                                className="flex items-center gap-1 rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-blue/90 disabled:opacity-50"
+                              >
+                                {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                                保存
+                              </button>
+                              <button
+                                onClick={handleCancelEdit}
+                                disabled={saving}
+                                className="flex items-center gap-1 rounded-lg border border-dark-border px-3 py-1.5 text-xs text-dark-text-secondary hover:text-dark-text"
+                              >
+                                <X size={12} />
+                                取消
+                              </button>
+                            </div>
+                          </div>
                         ) : (
-                          <pre className="whitespace-pre-wrap rounded-lg bg-dark-bg p-4 text-xs text-dark-text leading-relaxed font-mono max-h-80 overflow-y-auto">
-                            {previewFile.content}
-                          </pre>
+                          <div className="space-y-3">
+                            <pre className="whitespace-pre-wrap rounded-lg bg-dark-bg p-4 text-xs text-dark-text leading-relaxed font-mono max-h-80 overflow-y-auto">
+                              {previewFile.content}
+                            </pre>
+                            {!previewFile.content.startsWith('(') && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={handleEdit}
+                                  className="flex items-center gap-1 rounded-lg border border-dark-border px-3 py-1.5 text-xs text-dark-text-secondary hover:text-accent-blue transition-colors"
+                                >
+                                  <Pencil size={12} />
+                                  编辑
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}

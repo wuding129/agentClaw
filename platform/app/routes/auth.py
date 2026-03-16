@@ -22,19 +22,32 @@ from app.auth.dependencies import get_current_user
 from app.config import settings
 from app.container.shared_manager import ensure_shared_container
 from app.db.engine import get_db
-from app.db.models import User
+from app.db.models import User, UserAgent
 from app.personas import load_soul_md
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-async def _create_agent_for_user(user_id: str, username: str, is_admin: bool = False) -> bool:
-    """Create an Agent for the user in the shared OpenClaw instance.
+def _sanitize_agent_name(name: str) -> str:
+    """Sanitize agent name for use in openclaw agent id."""
+    return "".join(c for c in name if c.isalnum() or c in "-_").lower()[:30]
 
-    For regular users, sets the SkillClaw SOUL.md as the default personality.
 
-    Returns True if successful, False otherwise.
+async def _create_default_agent_for_user(
+    db: AsyncSession,
+    user_id: str,
+    username: str,
+    is_admin: bool = False,
+) -> UserAgent | None:
+    """Create the default Agent for a new user.
+
+    This creates both the UserAgent record in the database and the agent
+    in the shared OpenClaw instance.
+
+    Returns the created UserAgent or None if failed.
     """
+    import uuid
+
     # Get shared container URL
     if settings.dev_openclaw_url:
         bridge_url = settings.dev_openclaw_url
@@ -42,46 +55,77 @@ async def _create_agent_for_user(user_id: str, username: str, is_admin: bool = F
         container_info = await ensure_shared_container()
         bridge_url = f"http://{container_info['internal_host']}:{container_info['internal_port']}"
 
-    # Create a user-friendly agent name: username + short uuid prefix
-    # Sanitize username: remove special chars, limit length
-    safe_username = "".join(c for c in username if c.isalnum() or c in "-_").lower()[:20]
-    short_id = user_id[:8]
-    agent_name = f"{safe_username}-{short_id}"
+    # Generate openclaw agent id
+    safe_username = _sanitize_agent_name(username)
+    suffix = str(uuid.uuid4())[:8]
+    openclaw_agent_id = f"{user_id}-{safe_username}-{suffix}"
 
+    # Agent display name
+    agent_name = f"{username}'s Agent"
+
+    # Create agent in OpenClaw first
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            # Create the agent (internal call, use X-Is-Admin to bypass admin check)
-            # Use user_id as agentId for proper user-agent mapping
             resp = await client.post(
                 f"{bridge_url}/api/agents",
-                json={"name": agent_name, "agentId": user_id},
+                json={"name": agent_name, "agentId": openclaw_agent_id},
                 headers={"X-Is-Admin": "true"},
             )
             if resp.status_code != 200:
-                print(f"[auth] Failed to create agent for {user_id}: {resp.status_code} - {resp.text}")
-                return False
+                print(f"[auth] Failed to create agent in OpenClaw for {user_id}: {resp.status_code} - {resp.text}")
+                return None
 
             # For regular users, set the SkillClaw SOUL.md
             if not is_admin:
                 soul_resp = await client.put(
-                    f"{bridge_url}/api/agents/{user_id}/files/SOUL.md",
+                    f"{bridge_url}/api/agents/{openclaw_agent_id}/files/SOUL.md",
                     json={"content": load_soul_md()},
-                    headers={"X-Agent-Id": user_id, "X-Is-Admin": "true"},
+                    headers={"X-Agent-Id": openclaw_agent_id, "X-Is-Admin": "true"},
                 )
                 if soul_resp.status_code != 200:
-                    print(f"[auth] Warning: Failed to set SkillClaw SOUL.md for user {user_id}")
-
-            return True
+                    print(f"[auth] Warning: Failed to set SOUL.md for agent {openclaw_agent_id}")
     except Exception as e:
-        print(f"[auth] Failed to create agent for user {user_id}: {e}")
-        return False
+        print(f"[auth] Failed to create agent in OpenClaw for user {user_id}: {e}")
+        return None
+
+    # Create UserAgent record in database
+    agent = UserAgent(
+        user_id=user_id,
+        openclaw_agent_id=openclaw_agent_id,
+        name=agent_name,
+        description="Your default agent",
+        is_default=True,
+        soul_md=load_soul_md() if not is_admin else "",
+    )
+    db.add(agent)
+    await db.commit()
+    await db.refresh(agent)
+
+    return agent
 
 
-async def _delete_agent_for_user(user_id: str, delete_files: bool = True) -> bool:
-    """Delete an Agent from the shared OpenClaw instance.
+async def _delete_agents_for_user(
+    db: AsyncSession,
+    user_id: str,
+    delete_files: bool = True,
+) -> bool:
+    """Delete all agents for a user.
 
-    Returns True if successful, False otherwise.
+    This archives all UserAgent records and deletes them from OpenClaw.
+
+    Returns True if successful.
     """
+    from sqlalchemy import select
+
+    # Get all active agents for the user
+    result = await db.execute(
+        select(UserAgent).where(
+            UserAgent.user_id == user_id,
+            UserAgent.status == "active",
+        )
+    )
+    agents = result.scalars().all()
+
     # Get shared container URL
     if settings.dev_openclaw_url:
         bridge_url = settings.dev_openclaw_url
@@ -89,16 +133,27 @@ async def _delete_agent_for_user(user_id: str, delete_files: bool = True) -> boo
         container_info = await ensure_shared_container()
         bridge_url = f"http://{container_info['internal_host']}:{container_info['internal_port']}"
 
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.delete(
-                f"{bridge_url}/api/agents/{user_id}",
-                params={"delete_files": "true" if delete_files else "false"},
-            )
-            return resp.status_code == 200
-    except Exception as e:
-        print(f"[auth] Failed to delete agent for user {user_id}: {e}")
-        return False
+    success = True
+    for agent in agents:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.delete(
+                    f"{bridge_url}/api/agents/{agent.openclaw_agent_id}",
+                    params={"delete_files": "true" if delete_files else "false"},
+                    headers={"X-Is-Admin": "true"},
+                )
+                if resp.status_code != 200:
+                    print(f"[auth] Failed to delete agent {agent.openclaw_agent_id} from OpenClaw: {resp.text}")
+                    success = False
+
+            # Archive the agent record
+            agent.status = "archived"
+        except Exception as e:
+            print(f"[auth] Failed to delete agent {agent.openclaw_agent_id}: {e}")
+            success = False
+
+    await db.commit()
+    return success
 
 
 # ---------------------------------------------------------------------------
@@ -151,10 +206,11 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
     user = await create_user(db, req.username, req.email, req.password)
 
-    # Create Agent for the new user in shared OpenClaw instance
-    # Pass is_admin=True for admin users (role is set during user creation)
-    agent_created = await _create_agent_for_user(user.id, user.username, is_admin=(user.role == "admin"))
-    if not agent_created:
+    # Create default Agent for the new user
+    agent = await _create_default_agent_for_user(
+        db, user.id, user.username, is_admin=(user.role == "admin")
+    )
+    if agent is None:
         raise HTTPException(status_code=500, detail="Failed to create agent")
 
     return TokenResponse(

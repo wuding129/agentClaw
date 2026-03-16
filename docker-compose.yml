@@ -100,6 +100,7 @@ services:
       PLATFORM_DEV_OPENCLAW_URL: http://openclaw-shared:18080
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # Docker API access for container management
+      - ./platform:/app  # Mount local platform code for development
       - userdata:/data/openclaw-users
       - curated-skills:/app/curated-skills  # User-submitted skills after admin review
       - platform-skills:/app/platform-skills  # Platform built-in skills (read-only)

@@ -40,7 +40,7 @@ export default function Layout() {
 
   return (
     <ChatContext.Provider value={{ openChat, closeChat }}>
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex h-screen overflow-hidden bg-bg-base">
         <Sidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
           <TopBar />

@@ -117,7 +117,11 @@ export function filemanagerRoutes(config: BridgeConfig): Router {
         absPath.endsWith(".yml") ||
         absPath.endsWith(".yaml") ||
         absPath.endsWith(".toml") ||
-        absPath.endsWith(".jsonl");
+        absPath.endsWith(".jsonl") ||
+        absPath.endsWith(".py") ||
+        absPath.endsWith(".sh") ||
+        absPath.endsWith(".js") ||
+        absPath.endsWith(".ts");
 
       if (isText && stat.size <= 200 * 1024) {
         const content = fs.readFileSync(absPath, "utf-8");
@@ -311,6 +315,52 @@ export function filemanagerRoutes(config: BridgeConfig): Router {
 
     fs.mkdirSync(absPath, { recursive: true });
     res.json({ name: path.basename(absPath), path: relPath, type: "directory" });
+  }));
+
+  // PUT /api/filemanager/update?path=&agentId= — update file content
+  router.put("/filemanager/update", asyncHandler(async (req, res) => {
+    const requestAgentId = req.headers["x-agent-id"] as string | undefined;
+    const isAdmin = req.headers["x-is-admin"] === "true";
+    let agentId = requestAgentId;
+    if (isAdmin && req.query.agentId) {
+      agentId = req.query.agentId as string;
+    }
+
+    const rootDir = getAgentRootDir(baseDir, agentId);
+    const relPath = req.query.path as string;
+    if (!relPath) {
+      res.status(400).json({ detail: "Path is required" });
+      return;
+    }
+
+    const absPath = sanitizePath(relPath, rootDir);
+    if (!absPath) {
+      res.status(400).json({ detail: "Invalid path" });
+      return;
+    }
+
+    // Check if file exists and is a file
+    if (!fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) {
+      res.status(404).json({ detail: "File not found" });
+      return;
+    }
+
+    const { content } = req.body as { content: string };
+    if (content === undefined) {
+      res.status(400).json({ detail: "Content is required" });
+      return;
+    }
+
+    fs.writeFileSync(absPath, content, "utf-8");
+    const stat = fs.statSync(absPath);
+
+    res.json({
+      name: path.basename(absPath),
+      path: relPath,
+      type: "file",
+      size: stat.size,
+      modified: stat.mtime.toISOString(),
+    });
   }));
 
   return router;

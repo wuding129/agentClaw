@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     # Bridge token for signing isAdmin parameter (must match bridge config)
     bridge_token: str = "change-me-in-production"
 
+    # Proxy token for bridge-to-platform service authentication
+    # Should match FRAMECLAW_PROXY__TOKEN in bridge config
+    proxy_token: str = "platform-shared-token"
+
     # Local dev: set to e.g. "http://127.0.0.1:18080" to skip Docker containers
     dev_openclaw_url: str = ""
 

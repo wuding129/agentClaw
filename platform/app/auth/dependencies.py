@@ -46,7 +46,7 @@ async def get_user_flexible(
         if user is not None and user.is_active:
             return user
 
-    # Fallback: try container_token
+    # Fallback: try container_token (per-agent, not per-user)
     container = (await db.execute(
         select(Container).where(Container.container_token == token)
     )).scalar_one_or_none()
@@ -57,15 +57,46 @@ async def get_user_flexible(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Container token has expired, please re-authenticate"
             )
-        user = await get_user_by_id(db, container.user_id)
-        if user is not None and user.is_active:
-            return user
+        # Find user through UserAgent (agent_id -> UserAgent -> user_id)
+        from app.db.models import UserAgent
+        user_agent = (await db.execute(
+            select(UserAgent).where(UserAgent.openclaw_agent_id == container.agent_id)
+        )).scalar_one_or_none()
+        if user_agent:
+            user = await get_user_by_id(db, user_agent.user_id)
+            if user is not None and user.is_active:
+                return user
 
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
 
-async def require_admin(user: User = Depends(get_current_user)) -> User:
-    """Require the current user to have admin role."""
-    if user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
-    return user
+async def require_admin(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Require the current user to have admin role.
+
+    Also allows bridge-to-platform communication using bridge_token.
+    """
+    token = credentials.credentials
+
+    # Try JWT first
+    payload = decode_token(token)
+    if payload is not None and payload.get("type") == "access":
+        user = await get_user_by_id(db, payload["sub"])
+        if user is not None and user.is_active and user.role == "admin":
+            return user
+
+    # Fallback: bridge/proxy token for service-to-service communication
+    from app.config import settings
+    if token == settings.bridge_token or token == settings.proxy_token:
+        # Return a virtual admin user for bridge requests
+        return User(
+            id="bridge",
+            username="bridge",
+            email="bridge@internal",
+            role="admin",
+            is_active=True,
+        )
+
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")

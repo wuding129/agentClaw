@@ -46,8 +46,13 @@ export default function Dashboard() {
   const userAgents = agents.filter(a => !['main', 'skill-reviewer'].includes(a.id))
 
   useEffect(() => {
-    Promise.all([fetchAgents(), fetchDashboardStats()])
-      .then(([a, s]) => { setAgents(a); setStats(s) })
+    fetchAgents()
+      .then(a => {
+        setAgents(a)
+        // Reuse agent count to avoid duplicate API call
+        return fetchDashboardStats(a.length)
+      })
+      .then(s => setStats(s))
       .finally(() => setLoading(false))
   }, [])
 

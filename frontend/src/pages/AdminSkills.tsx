@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import {
   adminListCuratedSkills, adminUploadCuratedSkill, adminUpdateCuratedSkill,
   adminDeleteCuratedSkill, adminListSubmissions, adminApproveSubmission,
-  adminRejectSubmission, listPlatformSkills, adminUpdatePlatformSkillVisibility,
+  adminRejectSubmission, adminListPlatformSkills, adminUpdatePlatformSkillVisibility,
   adminSyncPlatformSkills,
 } from '../lib/api'
-import type { CuratedSkill, SkillSubmission, PlatformSkill } from '../lib/api'
+import type { CuratedSkill, SkillSubmission, AdminPlatformSkill } from '../lib/api'
 import {
   Loader2, Plus, Trash2, Star, Check, X, Upload,
   ChevronUp, Edit2, Eye, EyeOff, RefreshCw, Package,
@@ -21,7 +21,7 @@ export default function AdminSkills() {
   const [loading, setLoading] = useState(true)
 
   // Platform skills
-  const [platformSkills, setPlatformSkills] = useState<PlatformSkill[]>([])
+  const [platformSkills, setPlatformSkills] = useState<AdminPlatformSkill[]>([])
   const [loadingPlatform, setLoadingPlatform] = useState(true)
   const [syncingPlatform, setSyncingPlatform] = useState(false)
   const [togglingSkill, setTogglingSkill] = useState<string | null>(null)
@@ -55,20 +55,9 @@ export default function AdminSkills() {
   }
 
   const refreshPlatform = () => {
-    listPlatformSkills()
+    adminListPlatformSkills()
       .then(skills => {
-        // Convert to PlatformSkill format with visibility
-        const withVisibility: PlatformSkill[] = skills.map(s => ({
-          name: s.name,
-          description: s.description,
-          source: s.source,
-          available: s.available,
-          disabled: s.disabled,
-          compatible: s.compatible,
-          path: s.path,
-          is_visible: true, // Default to visible if not in config
-        }))
-        setPlatformSkills(withVisibility)
+        setPlatformSkills(skills)
       })
       .catch(() => setPlatformSkills([]))
       .finally(() => setLoadingPlatform(false))
@@ -102,7 +91,7 @@ export default function AdminSkills() {
     try {
       await adminUpdatePlatformSkillVisibility(skillName, !currentVisible)
       setPlatformSkills(prev => prev.map(s =>
-        s.name === skillName ? { ...s, is_visible: !currentVisible } : s
+        s.skill_name === skillName ? { ...s, is_visible: !currentVisible } : s
       ))
     } catch {
       // ignore
@@ -435,10 +424,10 @@ export default function AdminSkills() {
           ) : (
             <div className="space-y-2">
               {platformSkills.map(skill => {
-                const isToggling = togglingSkill === skill.name
+                const isToggling = togglingSkill === skill.skill_name
                 return (
                   <div
-                    key={skill.name}
+                    key={skill.skill_name}
                     className="flex items-center justify-between rounded-lg border border-dark-border bg-dark-card px-4 py-3"
                   >
                     <div className="flex items-center gap-3">
@@ -446,27 +435,27 @@ export default function AdminSkills() {
                         <Package size={16} className="text-accent-blue" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-medium text-dark-text">{skill.name}</h3>
+                        <h3 className="text-sm font-medium text-dark-text">{skill.skill_name}</h3>
                         <p className="text-xs text-dark-text-secondary">{skill.description || '暂无描述'}</p>
                       </div>
                     </div>
                     <button
-                      onClick={() => handleToggleVisibility(skill.name, skill.is_visible !== false)}
+                      onClick={() => handleToggleVisibility(skill.skill_name, skill.is_visible)}
                       disabled={isToggling}
                       className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                        skill.is_visible !== false
+                        skill.is_visible
                           ? 'bg-accent-green/10 text-accent-green hover:bg-accent-green/20'
                           : 'bg-dark-bg text-dark-text-secondary hover:text-dark-text'
                       }`}
                     >
                       {isToggling ? (
                         <Loader2 size={12} className="animate-spin" />
-                      ) : skill.is_visible !== false ? (
+                      ) : skill.is_visible ? (
                         <Eye size={12} />
                       ) : (
                         <EyeOff size={12} />
                       )}
-                      {skill.is_visible !== false ? '可见' : '隐藏'}
+                      {skill.is_visible ? '可见' : '隐藏'}
                     </button>
                   </div>
                 )

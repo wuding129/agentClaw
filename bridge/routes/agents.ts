@@ -80,75 +80,98 @@ function getAgentRootDir(baseDir: string, agentId: string | undefined): string {
 export function agentsRoutes(client: BridgeGatewayClient, config: BridgeConfig): Router {
   const router = Router();
 
-  // GET /api/agents — list agents (filtered by user in multi-agent mode)
+  // GET /api/agents — list agents (from platform database + OpenClaw)
   router.get("/agents", asyncHandler(async (req, res) => {
     const agentId = req.headers["x-agent-id"] as string | undefined;
     const isAdmin = req.headers["x-is-admin"] === "true";
     const authHeader = req.headers["authorization"] as string | undefined;
-    // scope=self: only return current user's agents + system agents (for chat)
-    // scope=all (default for admin): return all agents (for admin dashboard)
     const scope = req.query.scope as string | undefined;
 
     try {
-      const result = await client.request<{ agents: Array<{ id: string; name?: string; identity?: { name?: string } }> }>("agents.list", {});
-
-      // Debug logging
-      console.log(`[agents] isAdmin=${isAdmin}, scope=${scope}, agentId=${agentId}`);
-
-      // In multi-agent mode:
-      // - Regular users only see their own agent
-      // - Admins see ALL agents in admin dashboard, but only their own + system agents in chat
-      let agents = result?.agents || [];
-      const systemAgents = ["main", "skill-reviewer"];
-
-      if (!isAdmin) {
-        // Non-admin: only see their own agent (no system agents)
-        agents = agents.filter((a) => a.id === agentId);
-      } else if (scope === AgentScope.Self) {
-        // Admin in chat mode: only see own agent + system agents
-        console.log(`[agents] Filtering to self only for admin`);
-        agents = agents.filter((a) => a.id === agentId || SystemAgentIds.includes(a.id as typeof SystemAgentIds[number]));
+      if (!config.proxyUrl) {
+        throw new Error("Proxy URL not configured");
       }
-      // Admin with scope=all or no scope: see all agents (no filtering)
-      console.log(`[agents] Returning ${agents.length} agents`);
 
-      // Enrich agents with display names for admin
-      if (isAdmin && authHeader && config.proxyUrl) {
-        const gatewayUrl = config.proxyUrl.replace("/llm/v1", "");
-        const token = authHeader.replace("Bearer ", "");
-        const users = await fetchAllUsers(gatewayUrl, token);
+      const gatewayUrl = config.proxyUrl.replace("/llm/v1", "");
+      const token = authHeader?.replace("Bearer ", "") || "";
+
+      // For admin: get all agents from OpenClaw directly (includes system agents)
+      // For regular user: get agents from platform (filtered to their agents)
+      let agents: Array<{
+        id: string;
+        name: string;
+        identity?: { name?: string; emoji?: string };
+        displayName?: string;
+        username?: string;
+      }> = [];
+
+      if (isAdmin) {
+        // Get all agents from OpenClaw directly (includes system agents like main, skill-reviewer)
+        const openclawResult = await client.request<{ agents: Array<{ id: string; name: string; identity?: { name?: string; emoji?: string } }> }>("agents.list", {});
+        const openclawAgents = openclawResult?.agents || [];
+
+        // Get user-agent mappings from platform (use proxyToken for platform auth)
+        const users = await fetchAllUsers(gatewayUrl, config.proxyToken);
         const userMap = new Map(users.map((u) => [u.id, u]));
 
-        agents = agents.map((agent) => {
-          const user = userMap.get(agent.id);
+        // Get all user agents from platform for mapping
+        const platformAgentsResp = await fetch(`${gatewayUrl}/api/admin/user-agents`, {
+          headers: { "Authorization": `Bearer ${config.proxyToken}` },
+        });
+        const platformAgents = platformAgentsResp.ok
+          ? await platformAgentsResp.json() as Array<{ openclaw_agent_id: string; user_id: string; name: string }>
+          : [];
+        const platformAgentMap = new Map(platformAgents.map((a) => [a.openclaw_agent_id, a]));
+
+        // Enrich OpenClaw agents with user info
+        agents = openclawAgents.map((agent) => {
+          const platformAgent = platformAgentMap.get(agent.id);
+          const user = platformAgent ? userMap.get(platformAgent.user_id) : null;
           const isSelf = agent.id === agentId;
-          let displayName: string;
-          if (user) {
-            const selfMarker = isSelf ? " [我]" : "";
-            displayName = `${user.username}${selfMarker}`;
-          } else if (SystemAgentIds.includes(agent.id as typeof SystemAgentIds[number])) {
-            // System agents - show as-is
-            displayName = agent.id;
-          } else {
-            // For orphan agents (no associated user), show with a marker
-            const baseName = agent.identity?.name || agent.name;
-            if (baseName && baseName !== agent.id) {
-              displayName = `${baseName} [未关联用户]`;
-            } else {
-              displayName = `${agent.id.slice(0, 8)}... [未关联用户]`;
-            }
-          }
+          const isSystem = SystemAgentIds.includes(agent.id as typeof SystemAgentIds[number]);
+
           return {
             ...agent,
-            displayName,
+            name: platformAgent?.name || agent.name,
+            displayName: isSystem
+              ? (agent.identity?.name || agent.name)
+              : user
+                ? `${user.username}${isSelf ? " [我]" : ""}`
+                : (agent.name || agent.id),
             username: user?.username,
           };
         });
+      } else {
+        // Regular user: get agents from platform (filtered to their agents)
+        const resp = await fetch(`${gatewayUrl}/api/agents`, {
+          headers: { "Authorization": `Bearer ${token}` },
+        });
+
+        if (!resp.ok) {
+          throw new Error(`Failed to fetch agents from platform: ${resp.status}`);
+        }
+
+        const data = await resp.json() as {
+          agents: Array<{ id: string; name: string; openclaw_agent_id?: string }>;
+        };
+
+        // Map platform agents to bridge format
+        agents = data.agents?.map((a) => ({
+          id: a.openclaw_agent_id || a.id,
+          name: a.name,
+        })) || [];
+
+        // Filter by current agent (for multi-agent routing)
+        if (agentId) {
+          agents = agents.filter((a) => a.id === agentId);
+        }
       }
 
-      // Return in format expected by frontend: { agents: [...] }
+      console.log(`[agents] isAdmin=${isAdmin}, scope=${scope}, agentId=${agentId}, count=${agents.length}`);
+
       res.json({ agents });
     } catch (err) {
+      console.error("[agents] Error listing agents:", err);
       res.status(500).json({ detail: (err as Error).message });
     }
   }));
@@ -165,21 +188,26 @@ export function agentsRoutes(client: BridgeGatewayClient, config: BridgeConfig):
 
     const { name, workspace, emoji, avatar, installed_skills, model, agentId } = req.body;
 
-    // If agentId is provided, use it as the name (for user-agent mapping)
-    const actualName = agentId || name;
+    // If agentId is provided, use it as the agent id (for user-agent mapping)
+    const actualName = name || agentId;
+    const actualAgentId = agentId || name;
 
     try {
-      const defaultWorkspace = path.join(config.openclawHome, `workspace-${actualName}`);
+      const defaultWorkspace = path.join(config.openclawHome, `workspace-${actualAgentId}`);
       const actualWorkspace = workspace || defaultWorkspace;
       const resolvedWorkspace = actualWorkspace.startsWith("~")
         ? actualWorkspace.replace("~", os.homedir())
         : actualWorkspace;
-      const params: Record<string, unknown> = { name: actualName, workspace: actualWorkspace };
+      const params: Record<string, unknown> = { id: actualAgentId, name: actualName, workspace: actualWorkspace };
       if (emoji !== undefined) params.emoji = emoji;
       if (avatar !== undefined) params.avatar = avatar;
       if (model !== undefined) params.model = model;
 
       const result = await client.request<Record<string, unknown>>("agents.create", params);
+
+      // Note: We don't update openclaw.json anymore.
+      // Agents are tracked in platform database (UserAgent table) and
+      // the bridge's /api/agents endpoint fetches from platform directly.
 
       // Create workspace directory if it doesn't exist
       try {

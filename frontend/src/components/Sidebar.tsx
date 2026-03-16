@@ -73,15 +73,15 @@ export default function Sidebar() {
   ]
 
   return (
-    <aside className="flex w-56 flex-col bg-dark-sidebar border-r border-dark-border">
+    <aside className="flex w-56 flex-col bg-bg-elevated border-r border-border-default">
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-blue text-sm font-bold text-white">
           SC
         </div>
         <div>
-          <div className="text-sm font-semibold text-dark-text">SkillClaw</div>
-          <div className="text-xs text-dark-text-secondary">技能商店平台 v2026.3</div>
+          <div className="text-sm font-semibold text-text-primary">SkillClaw</div>
+          <div className="text-xs text-text-secondary">技能商店平台 v2026.3</div>
         </div>
       </div>
 
@@ -89,7 +89,7 @@ export default function Sidebar() {
       <nav className="flex-1 overflow-y-auto px-3 py-2">
         {navSections.map(section => (
           <div key={section.label} className="mb-4">
-            <div className="mb-1.5 px-3 text-xs font-medium uppercase tracking-wider text-dark-text-secondary">
+            <div className="mb-1.5 px-3 text-xs font-medium uppercase tracking-wider text-text-tertiary">
               {section.label}
             </div>
             {section.items.map(item => {
@@ -103,7 +103,7 @@ export default function Sidebar() {
                   className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                     isActive
                       ? 'bg-accent-blue/15 text-accent-blue'
-                      : 'text-dark-text-secondary hover:bg-dark-card hover:text-dark-text'
+                      : 'text-text-secondary hover:bg-bg-surface hover:text-text-primary'
                   }`}
                 >
                   <Icon size={18} />
@@ -123,10 +123,10 @@ export default function Sidebar() {
       {/* User */}
       <NavLink
         to="/profile"
-        className={`border-t border-dark-border px-4 py-3 flex items-center gap-3 transition-colors ${
+        className={`border-t border-border-default px-4 py-3 flex items-center gap-3 transition-colors ${
           location.pathname === '/profile'
             ? 'bg-accent-blue/15 text-accent-blue'
-            : 'text-dark-text hover:bg-dark-card'
+            : 'text-text-primary hover:bg-bg-surface'
         }`}
       >
         <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-white ${
@@ -139,7 +139,7 @@ export default function Sidebar() {
             {user?.username ?? 'Loading...'}
             {isAdmin && <span className="ml-1 text-xs text-accent-green">(管理员)</span>}
           </div>
-          <div className="text-xs text-dark-text-secondary">{user?.email ?? ''}</div>
+          <div className="text-xs text-text-secondary">{user?.email ?? ''}</div>
         </div>
       </NavLink>
     </aside>

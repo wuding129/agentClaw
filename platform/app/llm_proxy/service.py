@@ -256,7 +256,7 @@ async def proxy_chat_completion(
                     user_result = await db.execute(select(User).where(User.id == user_id))
                     user = user_result.scalar_one_or_none()
 
-            # Fallback: container token
+            # Fallback: container token (now per-agent instead of per-user)
             if user is None:
                 result = await db.execute(
                     select(Container).where(Container.container_token == container_token)
@@ -270,8 +270,15 @@ async def proxy_chat_completion(
                         status_code=status.HTTP_401_UNAUTHORIZED,
                         detail="Container token has expired, please re-authenticate"
                     )
-                user_result = await db.execute(select(User).where(User.id == container.user_id))
-                user = user_result.scalar_one_or_none()
+                # Find user through UserAgent (agent_id -> UserAgent -> user_id)
+                from app.db.models import UserAgent
+                agent_result = await db.execute(
+                    select(UserAgent).where(UserAgent.openclaw_agent_id == container.agent_id)
+                )
+                user_agent = agent_result.scalar_one_or_none()
+                if user_agent:
+                    user_result = await db.execute(select(User).where(User.id == user_agent.user_id))
+                    user = user_result.scalar_one_or_none()
 
         if user is None or not user.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account disabled")

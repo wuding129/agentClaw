@@ -15,7 +15,7 @@ from app.auth.dependencies import require_admin
 from app.config import settings
 from app.container.shared_manager import ensure_shared_container, get_shared_container_info
 from app.db.engine import get_db
-from app.db.models import UsageRecord, User
+from app.db.models import UsageRecord, User, UserAgent
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
@@ -195,3 +195,21 @@ async def delete_user_container(user_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/user-agents")
+async def list_all_user_agents(db: AsyncSession = Depends(get_db)):
+    """List all user-agent mappings (for bridge to enrich agent data)."""
+    result = await db.execute(
+        select(UserAgent).where(UserAgent.status == "active")
+    )
+    agents = result.scalars().all()
+    return [
+        {
+            "id": a.id,
+            "user_id": a.user_id,
+            "openclaw_agent_id": a.openclaw_agent_id,
+            "name": a.name,
+        }
+        for a in agents
+    ]

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import io
 import json
 import logging
@@ -25,7 +27,7 @@ from app.auth.dependencies import get_current_user, get_user_flexible, require_a
 from app.config import settings
 from app.container.shared_manager import ensure_shared_container
 from app.db.engine import get_db
-from app.db.models import CuratedSkill, Notification, PlatformSkillVisibility, ReviewTask, SkillSubmission, User
+from app.db.models import CuratedSkill, Notification, PlatformSkillVisibility, ReviewTask, SkillSubmission, User, UserAgent
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,16 @@ class CuratedSkillOut(BaseModel):
     created_by: str
     created_at: datetime
     installed: bool = False
+
+
+class PlatformSkillOut(BaseModel):
+    name: str
+    description: str
+    source: str
+    available: bool
+    disabled: bool
+    compatible: bool
+    path: str
 
 
 class CreateCuratedSkillRequest(BaseModel):
@@ -110,6 +122,19 @@ async def _get_bridge_url() -> str:
         return settings.dev_openclaw_url
     container_info = await ensure_shared_container()
     return f"http://{container_info['internal_host']}:{container_info['internal_port']}"
+
+
+def _sign_agent_id(agent_id: str) -> str:
+    """Sign agentId to prevent tampering.
+
+    Bridge will verify this signature to ensure agentId came from Platform Gateway.
+    """
+    message = f"{agent_id}:{settings.bridge_token}"
+    return hmac.new(
+        settings.bridge_token.encode(),
+        message.encode(),
+        hashlib.sha256,
+    ).hexdigest()[:16]
 
 
 def _read_skill_files(skill_name: str) -> dict[str, str]:
@@ -232,6 +257,85 @@ async def list_curated_skills(
         )
         for s in skills
     ]
+
+
+@user_router.get("/platform", response_model=list[PlatformSkillOut])
+async def list_platform_skills(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_user_flexible),
+):
+    """List all visible platform skills for the current user.
+
+    Fetches skills from the bridge and filters by visibility configuration.
+    """
+    bridge_url = await _get_bridge_url()
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{bridge_url}/api/skills/platform")
+            if resp.status_code != 200:
+                return []
+
+            all_skills = resp.json()
+
+            # Get visibility config from database
+            visibility_records = (await db.execute(
+                select(PlatformSkillVisibility)
+            )).scalars().all()
+
+            visibility_map = {v.skill_name: v.is_visible for v in visibility_records}
+
+            # Filter to only visible skills, defaulting to visible if no config exists
+            visible_skills = [
+                skill for skill in all_skills
+                if visibility_map.get(skill.get("name"), True)
+            ]
+
+            return visible_skills
+    except Exception as e:
+        logger.error(f"[skills] Failed to fetch platform skills: {e}")
+        return []
+
+
+@user_router.post("/{skill_name}/copy")
+async def copy_skill_to_workspace(
+    skill_name: str,
+    user: User = Depends(get_user_flexible),
+    db: AsyncSession = Depends(get_db),
+):
+    """Copy a platform/builtin skill to user's workspace."""
+    bridge_url = await _get_bridge_url()
+
+    # Get user's default agent
+    result = await db.execute(
+        select(UserAgent).where(
+            UserAgent.user_id == user.id,
+            UserAgent.is_default == True,
+            UserAgent.status == "active",
+        )
+    )
+    user_agent = result.scalar_one_or_none()
+    if user_agent is None:
+        raise HTTPException(status_code=400, detail="No default agent found. Please create an agent first.")
+
+    agent_id = user_agent.openclaw_agent_id
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                f"{bridge_url}/api/skills/{skill_name}/copy",
+                headers={
+                    "X-Agent-Id": agent_id,
+                    "X-Agent-Id-Sig": _sign_agent_id(agent_id),
+                },
+            )
+            if resp.status_code != 200:
+                detail = resp.json().get("detail", "Failed to copy skill")
+                raise HTTPException(status_code=resp.status_code, detail=detail)
+            return resp.json()
+    except httpx.RequestError as e:
+        logger.error(f"[skills] Failed to copy skill {skill_name}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to copy skill. Please try again later.")
 
 
 @user_router.post("/curated/{skill_id}/install")

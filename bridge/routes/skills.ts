@@ -1,6 +1,7 @@
 import express, { Router, type Request } from "express";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import multer from "multer";
 import archiver from "archiver";
 import unzipper from "unzipper";
@@ -135,6 +136,24 @@ export function skillsRoutes(config: BridgeConfig, client: BridgeGatewayClient):
   const builtinSkillsDir = resolveBuiltinSkillsDir();
   const globalSkillsDir = path.join(config.openclawHome, "skills");
 
+  // Simple cache for skills scan results (expires after 30 seconds)
+  let skillsCache: { data: SkillInfo[]; timestamp: number; source: string } | null = null;
+  const CACHE_TTL_MS = 30000;
+
+  function getCachedSkills(dir: string, source: string): SkillInfo[] {
+    const now = Date.now();
+    if (skillsCache && skillsCache.source === source && (now - skillsCache.timestamp) < CACHE_TTL_MS) {
+      return skillsCache.data;
+    }
+    const skills = scanSkillsDir(dir, source);
+    skillsCache = { data: skills, timestamp: now, source };
+    return skills;
+  }
+
+  function invalidateSkillsCache(): void {
+    skillsCache = null;
+  }
+
   // Get workspace path for a specific agent
   // main agent uses default workspace, other agents use workspace-<agentId>
   function getAgentWorkspacePath(agentId: string): string {
@@ -224,8 +243,9 @@ export function skillsRoutes(config: BridgeConfig, client: BridgeGatewayClient):
     const skillConfig = getAgentSkillConfig(agentId);
     const disabledSet = new Set(skillConfig.disabled_skills);
 
-    const builtin = scanSkillsDir(builtinSkillsDir, "builtin");
-    const global = scanSkillsDir(globalSkillsDir, "global");
+    // Use cached builtin/global skills, but always fresh scan for workspace (per-agent)
+    const builtin = getCachedSkills(builtinSkillsDir, "builtin");
+    const global = getCachedSkills(globalSkillsDir, "global");
     const workspaceSkillsDir = getAgentSkillsDir(agentId);
     const workspace = scanSkillsDir(workspaceSkillsDir, "workspace");
 

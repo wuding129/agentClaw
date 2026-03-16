@@ -36,13 +36,35 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
+class UserAgent(Base):
+    """User's agent in the platform (supports multiple agents per user)."""
+
+    __tablename__ = "user_agents"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    openclaw_agent_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    # Display name for the agent (user can customize)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Whether this is the user's default agent
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Agent persona (SOUL.md content)
+    soul_md: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Agent status: active | archived
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
 class Container(Base):
-    """Per-user Docker container metadata."""
+    """Per-agent Docker container metadata (sandbox container token)."""
 
     __tablename__ = "containers"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id: Mapped[str] = mapped_column(String(36), nullable=False, unique=True, index=True)
+    # Changed from user_id to agent_id - each agent has its own container token
+    agent_id: Mapped[str] = mapped_column(String(36), nullable=False, unique=True, index=True)
     docker_id: Mapped[str] = mapped_column(String(128), nullable=True)  # Docker container ID
     container_token: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
     # Token expiration for security (default 30 days)

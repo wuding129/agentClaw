@@ -52,12 +52,12 @@ export default function Agents() {
   const AgentCard = ({ agent, showDelete = true }: { agent: BackendAgent; showDelete?: boolean }) => (
     <div
       key={agent.id}
-      className="rounded-xl border border-dark-border bg-dark-card p-5 hover:border-accent-blue/30 transition-colors cursor-pointer"
+      className="rounded-xl border border-border-default bg-bg-surface p-5 hover:border-accent-blue/30 transition-colors cursor-pointer shadow-card"
       onClick={() => navigate(`/agents/${agent.id}`)}
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-dark-bg">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-bg-base">
             {agent.identity?.emoji ? (
               <span className="text-lg">{agent.identity.emoji}</span>
             ) : (
@@ -65,8 +65,8 @@ export default function Agents() {
             )}
           </div>
           <div>
-            <div className="text-sm font-semibold text-dark-text">{(agent as any).displayName || agent.name || agent.identity?.name || agent.id}</div>
-            <div className="text-xs text-dark-text-secondary">{agent.id}</div>
+            <div className="text-sm font-semibold text-text-primary">{(agent as any).displayName || agent.name || agent.identity?.name || agent.id}</div>
+            <div className="text-xs text-text-secondary">{agent.id}</div>
           </div>
         </div>
       </div>
@@ -84,14 +84,14 @@ export default function Agents() {
     </div>
   )
 
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="animate-spin text-dark-text-secondary" size={32} /></div>
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="animate-spin text-text-secondary" size={32} /></div>
 
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-dark-text">Agents 管理</h1>
-          <p className="mt-1 text-sm text-dark-text-secondary">管理和配置 AI Agents</p>
+          <h1 className="text-2xl font-bold text-text-primary">Agents 管理</h1>
+          <p className="mt-1 text-sm text-text-secondary">管理和配置 AI Agents</p>
         </div>
         <button
           onClick={() => navigate('/agents/create')}
@@ -104,14 +104,14 @@ export default function Agents() {
 
       {/* Search */}
       <div className="mb-6 flex items-center gap-4">
-        <div className="flex items-center gap-2 rounded-lg bg-dark-card px-3 py-2">
-          <Search size={16} className="text-dark-text-secondary" />
+        <div className="flex items-center gap-2 rounded-lg bg-bg-surface border border-border-default px-3 py-2">
+          <Search size={16} className="text-text-secondary" />
           <input
             type="text"
             placeholder="搜索 Agent 名称或 ID..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="bg-transparent text-sm text-dark-text outline-none placeholder:text-dark-text-secondary"
+            className="bg-transparent text-sm text-text-primary outline-none placeholder:text-text-tertiary"
           />
         </div>
       </div>
@@ -121,7 +121,7 @@ export default function Agents() {
         <div className="mb-6">
           <div className="mb-3 flex items-center gap-2">
             <User size={18} className="text-accent-green" />
-            <h2 className="text-base font-semibold text-dark-text">我的 Agent</h2>
+            <h2 className="text-base font-semibold text-text-primary">我的 Agent</h2>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <AgentCard agent={myAgent} showDelete={false} />
@@ -134,7 +134,7 @@ export default function Agents() {
         <div className="mb-6">
           <div className="mb-3 flex items-center gap-2">
             <Shield size={18} className="text-accent-purple" />
-            <h2 className="text-base font-semibold text-dark-text">系统 Agents</h2>
+            <h2 className="text-base font-semibold text-text-primary">系统 Agents</h2>
             <span className="ml-2 rounded-full bg-accent-purple/10 px-2 py-0.5 text-xs text-accent-purple">{systemAgents.length}</span>
           </div>
           <div className="grid grid-cols-3 gap-4">
@@ -150,7 +150,7 @@ export default function Agents() {
         <div>
           <div className="mb-3 flex items-center gap-2">
             <Bot size={18} className="text-accent-blue" />
-            <h2 className="text-base font-semibold text-dark-text">其他用户 Agents</h2>
+            <h2 className="text-base font-semibold text-text-primary">其他用户 Agents</h2>
             <span className="ml-2 rounded-full bg-accent-blue/10 px-2 py-0.5 text-xs text-accent-blue">{otherAgents.length}</span>
           </div>
           <div className="grid grid-cols-3 gap-4">

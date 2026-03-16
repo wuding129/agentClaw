@@ -28,14 +28,13 @@ export async function removeAgent(agentId: string, deleteFiles = false) {
   return api.deleteAgent(agentId, deleteFiles)
 }
 
-export async function fetchDashboardStats() {
-  const [agentsResult, sessions, skills] = await Promise.all([
-    api.listAgents(),
+export async function fetchDashboardStats(agentCount?: number) {
+  const [sessions, skills] = await Promise.all([
     api.listSessions().catch(() => []),
     api.listSkills().catch(() => []),
   ])
   return {
-    totalAgents: agentsResult.agents?.length || 0,
+    totalAgents: agentCount ?? 0,
     totalSessions: sessions.length,
     totalSkills: skills.length,
   }
