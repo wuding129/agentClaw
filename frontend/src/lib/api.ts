@@ -25,6 +25,7 @@ export interface AuthUser {
 export interface AgentInfo {
   id: string
   name: string
+  displayName?: string
   identity?: {
     name?: string
     emoji?: string

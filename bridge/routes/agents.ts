@@ -99,9 +99,11 @@ export function agentsRoutes(client: BridgeGatewayClient, config: BridgeConfig):
         const systemAgents = ["main", "skill-reviewer"];
         agents = agents.map((agent) => {
           const user = userMap.get(agent.id);
+          const isSelf = agent.id === agentId;
           let displayName: string;
           if (user) {
-            displayName = `${user.username} (${agent.id.slice(0, 8)})`;
+            const selfMarker = isSelf ? " [我]" : "";
+            displayName = `${user.username}${selfMarker}`;
           } else if (systemAgents.includes(agent.id)) {
             // System agents - show as-is
             displayName = agent.id;

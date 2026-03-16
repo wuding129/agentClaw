@@ -97,7 +97,7 @@ export default function Sessions() {
                   <option value="">所有 Agents</option>
                   {agents.map(agent => (
                     <option key={agent.id} value={agent.id}>
-                      {agent.identity?.name || agent.name || agent.id}
+                      {agent.displayName || agent.identity?.name || agent.name || agent.id}
                     </option>
                   ))}
                 </select>

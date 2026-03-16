@@ -811,7 +811,7 @@ export default function Chat() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-dark-text truncate">
-                            {agent.identity?.name || agent.name || agent.id}
+                            {agent.displayName || agent.identity?.name || agent.name || agent.id}
                           </span>
                           {agent.id === defaultAgentId && (
                             <span className="rounded-full bg-accent-blue/10 px-2 py-0.5 text-[10px] text-accent-blue font-medium shrink-0">
