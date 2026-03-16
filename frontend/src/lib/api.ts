@@ -245,8 +245,9 @@ export async function changepassword(
 // Agent functions
 // ---------------------------------------------------------------------------
 
-export async function listAgents(): Promise<AgentListResult> {
-  return fetchJSON<AgentListResult>('/api/openclaw/agents')
+export async function listAgents(scope?: 'self' | 'all'): Promise<AgentListResult> {
+  const query = scope ? `?scope=${scope}` : ''
+  return fetchJSON<AgentListResult>(`/api/openclaw/agents${query}`)
 }
 
 export async function createAgent(

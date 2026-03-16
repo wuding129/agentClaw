@@ -70,6 +70,9 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8080
 
+    # Bridge token for signing isAdmin parameter (must match bridge config)
+    bridge_token: str = "change-me-in-production"
+
     # Local dev: set to e.g. "http://127.0.0.1:18080" to skip Docker containers
     dev_openclaw_url: str = ""
 

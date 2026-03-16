@@ -5,6 +5,7 @@ import os from "node:os";
 export interface BridgeConfig {
   proxyUrl: string;
   proxyToken: string;
+  bridgeToken: string; // Token for verifying isAdmin signature from Platform Gateway
   model: string;
   gatewayPort: number;
   bridgePort: number;
@@ -18,6 +19,7 @@ export interface BridgeConfig {
 export function loadConfig(): BridgeConfig {
   const proxyUrl = process.env.FRAMECLAW_PROXY__URL || "http://localhost:8080/llm/v1";
   const proxyToken = process.env.FRAMECLAW_PROXY__TOKEN || "dev-token";
+  const bridgeToken = process.env.PLATFORM_BRIDGE_TOKEN || "change-me-in-production";
   const model = process.env.FRAMECLAW_AGENTS__DEFAULTS__MODEL || "claude-sonnet-4-20250514";
   const gatewayPort = parseInt(process.env.OPENCLAW_GATEWAY_PORT || "18789", 10);
   const bridgePort = parseInt(process.env.BRIDGE_PORT || "18080", 10);
@@ -31,6 +33,7 @@ export function loadConfig(): BridgeConfig {
   return {
     proxyUrl,
     proxyToken,
+    bridgeToken,
     model,
     gatewayPort,
     bridgePort,

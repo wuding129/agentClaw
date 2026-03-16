@@ -164,7 +164,7 @@ export default function Chat() {
     setShowNewSession(true)
     setAgentsLoading(true)
     try {
-      const result = await listAgents()
+      const result = await listAgents('self')
       setAgents(result.agents || [])
       setDefaultAgentId(result.defaultId || '')
     } catch {

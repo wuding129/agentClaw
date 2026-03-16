@@ -38,6 +38,7 @@ services:
     environment:
       FRAMECLAW_PROXY__URL: "http://gateway:8080/llm/v1"
       FRAMECLAW_PROXY__TOKEN: "platform-shared-token"  # Shared token for multi-agent mode
+      PLATFORM_BRIDGE_TOKEN: ${PLATFORM_BRIDGE_TOKEN:-change-me-in-production}  # For signing isAdmin in WebSocket
       FRAMECLAW_AGENTS__DEFAULTS__MODEL: ${DEFAULT_MODEL:-stepfun/step-3.5-flash:free}
       # Sandbox configuration for agent isolation
       FRAMECLAW_AGENTS__DEFAULTS__SANDBOX__MODE: "all"
@@ -91,6 +92,7 @@ services:
       PLATFORM_LLM_API_KEY: ${LLM_API_KEY:-}
 
       PLATFORM_DEFAULT_MODEL: ${DEFAULT_MODEL:-dashscope/qwen3-coder-plus}
+      PLATFORM_BRIDGE_TOKEN: ${PLATFORM_BRIDGE_TOKEN:-change-me-in-production}  # For signing isAdmin in WebSocket
       PLATFORM_OPENCLAW_IMAGE: ${OPENCLAW_IMAGE:-openclaw:latest}
       PLATFORM_CONTAINER_NETWORK: openclaw-internal
       PLATFORM_CONTAINER_DATA_DIR: /data/openclaw-users

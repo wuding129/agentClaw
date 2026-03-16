@@ -87,13 +87,33 @@ export function createServer(client: BridgeGatewayClient, config: BridgeConfig):
     }
   });
 
+  // Verify isAdmin signature from Platform Gateway
+  function verifyIsAdmin(agentId: string, isAdmin: boolean, signature: string | null): boolean {
+    if (!signature) return false;
+    const expected = crypto
+      .createHmac("sha256", config.bridgeToken)
+      .update(`${agentId}:${isAdmin}:${config.bridgeToken}`)
+      .digest("hex")
+      .slice(0, 16);
+    return signature === expected;
+  }
+
   wss.on("connection", (downstream, request) => {
     // Extract agentId and isAdmin from URL query parameters
     const requestUrl = request.url || "/";
     const host = request.headers.host || "localhost";
     const url = new URL(requestUrl, `http://${host}`);
     const agentId = url.searchParams.get("agentId") || "";
-    const isAdmin = url.searchParams.get("isAdmin") === "true";
+    const rawIsAdmin = url.searchParams.get("isAdmin") === "true";
+    const isAdminSig = url.searchParams.get("isAdminSig");
+
+    // Verify isAdmin signature to prevent tampering
+    const isAdmin = verifyIsAdmin(agentId, rawIsAdmin, isAdminSig);
+    if (rawIsAdmin && !isAdmin) {
+      console.error(`[ws-relay] Invalid isAdmin signature from agentId=${agentId}, rejecting connection`);
+      downstream.close(4003, "Invalid isAdmin signature");
+      return;
+    }
 
     // Register this client with agentId and admin status
     downstreamClients.set(downstream, agentId);

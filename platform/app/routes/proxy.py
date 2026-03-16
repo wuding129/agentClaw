@@ -6,6 +6,8 @@ Requests are routed to the shared instance with agentId for multi-agent isolatio
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +17,19 @@ from app.config import settings
 from app.container.shared_manager import ensure_shared_container
 from app.db.engine import async_session, get_db
 from app.db.models import User
+
+
+def _sign_is_admin(agent_id: str, is_admin: bool) -> str:
+    """Sign isAdmin parameter to prevent tampering.
+
+    Bridge will verify this signature to ensure isAdmin came from Platform Gateway.
+    """
+    message = f"{agent_id}:{is_admin}:{settings.bridge_token}"
+    return hmac.new(
+        settings.bridge_token.encode(),
+        message.encode(),
+        hashlib.sha256,
+    ).hexdigest()[:16]
 
 router = APIRouter(prefix="/api/openclaw", tags=["proxy"])
 
@@ -149,11 +164,11 @@ async def proxy_websocket(
             target_ws_url = f"ws://{container_info['internal_host']}:18080/ws"
 
         # Add agentId and isAdmin query parameters for multi-agent routing
+        # Sign isAdmin to prevent tampering
         admin_param = "true" if is_admin else "false"
-        if "?" in target_ws_url:
-            target_ws_url = f"{target_ws_url}&agentId={user_id}&isAdmin={admin_param}"
-        else:
-            target_ws_url = f"{target_ws_url}?agentId={user_id}&isAdmin={admin_param}"
+        is_admin_sig = _sign_is_admin(user_id, is_admin)
+        sep = "&" if "?" in target_ws_url else "?"
+        target_ws_url = f"{target_ws_url}{sep}agentId={user_id}&isAdmin={admin_param}&isAdminSig={is_admin_sig}"
     # DB session is now released — not held during long-lived WebSocket relay
 
     import asyncio
