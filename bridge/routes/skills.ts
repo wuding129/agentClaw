@@ -408,5 +408,54 @@ export function skillsRoutes(config: BridgeConfig, client: BridgeGatewayClient):
     }
   }));
 
+  // GET /api/skills/platform — list platform skills (global skills visible to all users)
+  router.get("/skills/platform", asyncHandler(async (_req, res) => {
+    // Platform skills are global skills that all users can see (read-only)
+    const platformSkills = scanSkillsDir(globalSkillsDir, "platform");
+    res.json(platformSkills);
+  }));
+
+  // POST /api/skills/:name/copy — copy a platform/builtin skill to user's workspace
+  router.post("/skills/:name/copy", asyncHandler(async (req, res) => {
+    const name = req.params.name;
+    const agentId = getAgentIdFromRequest(req);
+    const workspaceSkillsDir = getAgentSkillsDir(agentId);
+
+    // Find skill in platform (global) or builtin
+    let sourceDir: string | null = null;
+    const platformDir = path.join(globalSkillsDir, name);
+    const builtinDir = path.join(builtinSkillsDir, name);
+
+    if (fs.existsSync(platformDir)) {
+      sourceDir = platformDir;
+    } else if (fs.existsSync(builtinDir)) {
+      sourceDir = builtinDir;
+    }
+
+    if (!sourceDir) {
+      res.status(404).json({ detail: "Skill not found in platform or builtin" });
+      return;
+    }
+
+    // Copy to workspace
+    const destDir = path.join(workspaceSkillsDir, name);
+    fs.mkdirSync(workspaceSkillsDir, { recursive: true });
+    if (fs.existsSync(destDir)) {
+      fs.rmSync(destDir, { recursive: true });
+    }
+    fs.cpSync(sourceDir, destDir, { recursive: true });
+
+    const content = fs.readFileSync(path.join(destDir, "SKILL.md"), "utf-8");
+    const { description } = parseSkillMd(content);
+
+    res.json({
+      name,
+      description,
+      source: "workspace",
+      available: true,
+      path: path.join(destDir, "SKILL.md"),
+    });
+  }));
+
   return router;
 }

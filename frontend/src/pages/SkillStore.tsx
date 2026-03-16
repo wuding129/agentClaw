@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react'
 import {
   listSkills, searchSkills, installSkill, toggleSkill,
   listCuratedSkills, installCuratedSkill, submitSkill, submitSkillWithFile, mySubmissions,
+  listPlatformSkills, copySkillToWorkspace,
 } from '../lib/api'
-import type { Skill, SkillSearchResult, CuratedSkill, SkillSubmission } from '../lib/api'
+import type { Skill, SkillSearchResult, CuratedSkill, SkillSubmission, PlatformSkill } from '../lib/api'
 import {
   Zap, Loader2, Search, Download, ExternalLink, Check,
-  AlertTriangle, Star, Send,
+  AlertTriangle, Star, Send, Copy, Package,
 } from 'lucide-react'
 
-type Tab = 'curated' | 'search' | 'installed'
+type Tab = 'curated' | 'search' | 'installed' | 'platform'
 
 export default function SkillStore() {
   const [tab, setTab] = useState<Tab>('curated')
@@ -22,6 +23,11 @@ export default function SkillStore() {
   const [curated, setCurated] = useState<CuratedSkill[]>([])
   const [loadingCurated, setLoadingCurated] = useState(true)
   const [installingCurated, setInstallingCurated] = useState<string | null>(null)
+
+  // Platform skills (global skills from project skills/ directory)
+  const [platformSkills, setPlatformSkills] = useState<PlatformSkill[]>([])
+  const [loadingPlatform, setLoadingPlatform] = useState(true)
+  const [copyingSkill, setCopyingSkill] = useState<string | null>(null)
 
   // Search state
   const [query, setQuery] = useState('')
@@ -59,12 +65,20 @@ export default function SkillStore() {
     listCuratedSkills().then(setCurated).catch(() => setCurated([])).finally(() => setLoadingCurated(false))
   }
 
+  const refreshPlatform = () => {
+    listPlatformSkills()
+      .then(data => setPlatformSkills(data.filter(s => s.name !== 'skill-creator')))
+      .catch(() => setPlatformSkills([]))
+      .finally(() => setLoadingPlatform(false))
+  }
+
   useEffect(() => {
     listSkills()
       .then(setSkills)
       .catch(() => setSkills([]))
       .finally(() => setLoadingSkills(false))
     refreshCurated()
+    refreshPlatform()
   }, [])
 
   const handleSearch = async (e?: React.FormEvent) => {
@@ -131,6 +145,21 @@ export default function SkillStore() {
     }
   }
 
+  const handleCopySkill = async (skillName: string) => {
+    if (copyingSkill) return
+    setCopyingSkill(skillName)
+    setInstallError('')
+    try {
+      await copySkillToWorkspace(skillName)
+      refreshSkills()
+      setTab('installed')
+    } catch (err: any) {
+      setInstallError(err?.message || '复制失败')
+    } finally {
+      setCopyingSkill(null)
+    }
+  }
+
   const handleSubmitSkill = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!submitName.trim() || submitting) return
@@ -194,6 +223,7 @@ export default function SkillStore() {
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'curated', label: '精选推荐' },
+    { key: 'platform', label: '平台技能' },
     { key: 'search', label: '商店搜索' },
     { key: 'installed', label: '已安装' },
   ]
@@ -427,6 +457,63 @@ export default function SkillStore() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ===== Platform Tab ===== */}
+      {tab === 'platform' && (
+        <div>
+          <div className="mb-4 rounded-lg border border-accent-blue/20 bg-accent-blue/5 px-4 py-3">
+            <p className="text-sm text-dark-text">
+              <Package size={14} className="inline mr-1.5 text-accent-blue" />
+              平台技能是系统内置的技能，可直接复制到你的 workspace 进行自定义修改。
+            </p>
+          </div>
+          {loadingPlatform ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 size={24} className="animate-spin text-accent-blue" />
+            </div>
+          ) : platformSkills.length === 0 ? (
+            <div className="rounded-xl border border-dark-border bg-dark-card p-8 text-center text-sm text-dark-text-secondary">
+              暂无平台技能
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4">
+              {platformSkills.map(skill => {
+                const isCopying = copyingSkill === skill.name
+                const isInstalled = skills.some(s => s.name === skill.name && s.source === 'workspace')
+                return (
+                  <div
+                    key={skill.name}
+                    className="rounded-xl border border-dark-border bg-dark-card p-5 hover:border-accent-blue/30 transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent-blue/10">
+                        <Package size={20} className="text-accent-blue" />
+                      </div>
+                      <span className="rounded bg-accent-blue/10 px-2 py-0.5 text-xs text-accent-blue">平台内置</span>
+                    </div>
+                    <h3 className="mt-3 text-sm font-semibold text-dark-text">{skill.name}</h3>
+                    <p className="mt-1 text-xs text-dark-text-secondary leading-relaxed line-clamp-2">{skill.description}</p>
+                    <button
+                      onClick={() => handleCopySkill(skill.name)}
+                      disabled={isCopying || isInstalled}
+                      className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent-blue px-3 py-2 text-sm font-medium text-white hover:bg-accent-blue/90 disabled:opacity-50 transition-colors"
+                    >
+                      {isCopying ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : isInstalled ? (
+                        <Check size={14} />
+                      ) : (
+                        <Copy size={14} />
+                      )}
+                      {isCopying ? '复制中...' : isInstalled ? '已复制' : '复制到 Workspace'}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 

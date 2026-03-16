@@ -725,6 +725,27 @@ export async function installCuratedSkill(skillId: string): Promise<{ ok: boolea
   })
 }
 
+// Platform skills (global skills visible to all users)
+export interface PlatformSkill {
+  name: string
+  description: string
+  source: string
+  available: boolean
+  disabled: boolean
+  compatible: boolean
+  path: string
+}
+
+export async function listPlatformSkills(): Promise<PlatformSkill[]> {
+  return fetchJSON<PlatformSkill[]>('/api/skills/platform')
+}
+
+export async function copySkillToWorkspace(skillName: string): Promise<Skill> {
+  return fetchJSON<Skill>(`/api/skills/${encodeURIComponent(skillName)}/copy`, {
+    method: 'POST',
+  })
+}
+
 export async function submitSkill(params: {
   skill_name: string
   description: string
