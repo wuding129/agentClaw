@@ -281,6 +281,29 @@ async function main(): Promise<void> {
     console.log(`[bridge] Bridge server listening on port ${config.bridgePort}`);
   });
 
+  // Auto-sync platform skills to database (if gateway is configured)
+  if (config.proxyUrl) {
+    setTimeout(async () => {
+      try {
+        const gatewayBase = config.proxyUrl!.replace("/llm/v1", "").replace(/\/+$/, "");
+        const resp = await fetch(`${gatewayBase}/api/admin/skills/platform-skills/sync`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${config.proxyToken || ""}`,
+          },
+        });
+        if (resp.ok) {
+          const data = await resp.json() as { added: number };
+          console.log(`[bridge] Platform skills synced: ${data.added} new skills added`);
+        } else {
+          console.log("[bridge] Platform skills sync: no new skills or already synced");
+        }
+      } catch (err) {
+        console.log("[bridge] Platform skills sync skipped (gateway may not be ready)");
+      }
+    }, 5000); // Wait 5s for gateway to fully initialize
+  }
+
   // Graceful shutdown
   const shutdown = () => {
     console.log("[bridge] Shutting down...");
