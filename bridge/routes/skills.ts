@@ -411,7 +411,34 @@ export function skillsRoutes(config: BridgeConfig, client: BridgeGatewayClient):
   // GET /api/skills/platform — list platform skills (global skills visible to all users)
   router.get("/skills/platform", asyncHandler(async (_req, res) => {
     // Platform skills are global skills that all users can see (read-only)
-    const platformSkills = scanSkillsDir(globalSkillsDir, "platform");
+    let platformSkills = scanSkillsDir(globalSkillsDir, "platform");
+
+    // Fetch visibility config from gateway (if available)
+    try {
+      // Derive gateway URL from proxy URL
+      const proxyUrl = config.proxyUrl || "";
+      const gatewayBase = proxyUrl.replace("/llm/v1", "").replace(/\/+$/, "");
+      if (gatewayBase) {
+        const resp = await fetch(`${gatewayBase}/api/admin/skills/platform-skills`, {
+          headers: {
+            "Authorization": `Bearer ${config.proxyToken || ""}`,
+          },
+        });
+        if (resp.ok) {
+          const visibilityConfig: Array<{ skill_name: string; is_visible: boolean }> = await resp.json();
+          const visibleSet = new Set(
+            visibilityConfig.filter(s => s.is_visible).map(s => s.skill_name)
+          );
+          // If we have visibility config, filter to only show visible skills
+          if (visibleSet.size > 0) {
+            platformSkills = platformSkills.filter(s => visibleSet.has(s.name));
+          }
+        }
+      }
+    } catch {
+      // If gateway is unavailable, return all platform skills
+    }
+
     res.json(platformSkills);
   }));
 

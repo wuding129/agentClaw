@@ -2,15 +2,16 @@ import { useState, useEffect } from 'react'
 import {
   adminListCuratedSkills, adminUploadCuratedSkill, adminUpdateCuratedSkill,
   adminDeleteCuratedSkill, adminListSubmissions, adminApproveSubmission,
-  adminRejectSubmission,
+  adminRejectSubmission, listPlatformSkills, adminUpdatePlatformSkillVisibility,
+  adminSyncPlatformSkills,
 } from '../lib/api'
-import type { CuratedSkill, SkillSubmission } from '../lib/api'
+import type { CuratedSkill, SkillSubmission, PlatformSkill } from '../lib/api'
 import {
   Loader2, Plus, Trash2, Star, Check, X, Upload,
-  ChevronUp, Edit2,
+  ChevronUp, Edit2, Eye, EyeOff, RefreshCw, Package,
 } from 'lucide-react'
 
-type AdminTab = 'curated' | 'submissions'
+type AdminTab = 'curated' | 'platform' | 'submissions'
 
 export default function AdminSkills() {
   const [tab, setTab] = useState<AdminTab>('curated')
@@ -18,6 +19,12 @@ export default function AdminSkills() {
   // Curated skills
   const [skills, setSkills] = useState<CuratedSkill[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Platform skills
+  const [platformSkills, setPlatformSkills] = useState<PlatformSkill[]>([])
+  const [loadingPlatform, setLoadingPlatform] = useState(true)
+  const [syncingPlatform, setSyncingPlatform] = useState(false)
+  const [togglingSkill, setTogglingSkill] = useState<string | null>(null)
 
   // Submissions
   const [submissions, setSubmissions] = useState<SkillSubmission[]>([])
@@ -47,6 +54,26 @@ export default function AdminSkills() {
     adminListCuratedSkills().then(setSkills).catch(() => setSkills([])).finally(() => setLoading(false))
   }
 
+  const refreshPlatform = () => {
+    listPlatformSkills()
+      .then(skills => {
+        // Convert to PlatformSkill format with visibility
+        const withVisibility: PlatformSkill[] = skills.map(s => ({
+          name: s.name,
+          description: s.description,
+          source: s.source,
+          available: s.available,
+          disabled: s.disabled,
+          compatible: s.compatible,
+          path: s.path,
+          is_visible: true, // Default to visible if not in config
+        }))
+        setPlatformSkills(withVisibility)
+      })
+      .catch(() => setPlatformSkills([]))
+      .finally(() => setLoadingPlatform(false))
+  }
+
   const refreshSubmissions = () => {
     adminListSubmissions(statusFilter || undefined)
       .then(setSubmissions)
@@ -55,7 +82,34 @@ export default function AdminSkills() {
   }
 
   useEffect(() => { refreshSkills() }, [])
+  useEffect(() => { refreshPlatform() }, [])
   useEffect(() => { refreshSubmissions() }, [statusFilter])
+
+  const handleSyncPlatform = async () => {
+    setSyncingPlatform(true)
+    try {
+      await adminSyncPlatformSkills()
+      refreshPlatform()
+    } catch {
+      // ignore
+    } finally {
+      setSyncingPlatform(false)
+    }
+  }
+
+  const handleToggleVisibility = async (skillName: string, currentVisible: boolean) => {
+    setTogglingSkill(skillName)
+    try {
+      await adminUpdatePlatformSkillVisibility(skillName, !currentVisible)
+      setPlatformSkills(prev => prev.map(s =>
+        s.name === skillName ? { ...s, is_visible: !currentVisible } : s
+      ))
+    } catch {
+      // ignore
+    } finally {
+      setTogglingSkill(null)
+    }
+  }
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -138,6 +192,7 @@ export default function AdminSkills() {
 
   const tabs: { key: AdminTab; label: string }[] = [
     { key: 'curated', label: '精选技能' },
+    { key: 'platform', label: '平台技能' },
     { key: 'submissions', label: '待审核' },
   ]
 
@@ -145,7 +200,7 @@ export default function AdminSkills() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-dark-text">技能管理</h1>
-        <p className="mt-1 text-sm text-dark-text-secondary">管理精选技能和用户提交审核</p>
+        <p className="mt-1 text-sm text-dark-text-secondary">管理精选技能、平台技能可见性和用户提交审核</p>
       </div>
 
       {/* Tabs */}
@@ -343,6 +398,76 @@ export default function AdminSkills() {
                         </div>
                       </div>
                     )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===== Platform Tab ===== */}
+      {tab === 'platform' && (
+        <div>
+          <div className="mb-4 flex items-center justify-between rounded-lg border border-accent-blue/20 bg-accent-blue/5 px-4 py-3">
+            <p className="text-sm text-dark-text">
+              <Package size={14} className="inline mr-1.5 text-accent-blue" />
+              平台技能来自项目 skills/ 目录，管理员可以控制哪些技能对用户可见。
+            </p>
+            <button
+              onClick={handleSyncPlatform}
+              disabled={syncingPlatform}
+              className="flex items-center gap-1.5 rounded-lg bg-accent-blue px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-blue/90 disabled:opacity-50"
+            >
+              {syncingPlatform ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              同步技能
+            </button>
+          </div>
+
+          {loadingPlatform ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 size={24} className="animate-spin text-accent-blue" />
+            </div>
+          ) : platformSkills.length === 0 ? (
+            <div className="rounded-xl border border-dark-border bg-dark-card p-8 text-center text-sm text-dark-text-secondary">
+              暂无平台技能，请先将技能放入项目 skills/ 目录
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {platformSkills.map(skill => {
+                const isToggling = togglingSkill === skill.name
+                return (
+                  <div
+                    key={skill.name}
+                    className="flex items-center justify-between rounded-lg border border-dark-border bg-dark-card px-4 py-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded bg-accent-blue/10">
+                        <Package size={16} className="text-accent-blue" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-dark-text">{skill.name}</h3>
+                        <p className="text-xs text-dark-text-secondary">{skill.description || '暂无描述'}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleToggleVisibility(skill.name, skill.is_visible !== false)}
+                      disabled={isToggling}
+                      className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                        skill.is_visible !== false
+                          ? 'bg-accent-green/10 text-accent-green hover:bg-accent-green/20'
+                          : 'bg-dark-bg text-dark-text-secondary hover:text-dark-text'
+                      }`}
+                    >
+                      {isToggling ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : skill.is_visible !== false ? (
+                        <Eye size={12} />
+                      ) : (
+                        <EyeOff size={12} />
+                      )}
+                      {skill.is_visible !== false ? '可见' : '隐藏'}
+                    </button>
                   </div>
                 )
               })}

@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import tarfile
 import uuid
 import zipfile
@@ -22,7 +23,7 @@ from app.auth.dependencies import get_current_user, get_user_flexible, require_a
 from app.config import settings
 from app.container.shared_manager import ensure_shared_container
 from app.db.engine import get_db
-from app.db.models import CuratedSkill, Notification, ReviewTask, SkillSubmission, User
+from app.db.models import CuratedSkill, Notification, PlatformSkillVisibility, ReviewTask, SkillSubmission, User
 
 # ---------------------------------------------------------------------------
 # Schemas
@@ -866,3 +867,117 @@ async def admin_reject_submission(
 
     await db.commit()
     return {"ok": True}
+
+
+# --- Platform skills visibility admin ---
+
+class PlatformSkillVisibilityOut(BaseModel):
+    id: str
+    skill_name: str
+    is_visible: bool
+    description: str
+    category: str
+    requirements: str
+    updated_at: datetime
+
+
+class UpdatePlatformSkillVisibilityRequest(BaseModel):
+    is_visible: bool
+
+
+@admin_router.get("/platform-skills", response_model=list[PlatformSkillVisibilityOut])
+async def admin_list_platform_skills(
+    db: AsyncSession = Depends(get_db),
+):
+    """List all platform skills with visibility configuration."""
+    skills = (await db.execute(
+        select(PlatformSkillVisibility).order_by(PlatformSkillVisibility.skill_name)
+    )).scalars().all()
+    return [
+        PlatformSkillVisibilityOut(
+            id=s.id,
+            skill_name=s.skill_name,
+            is_visible=s.is_visible,
+            description=s.description,
+            category=s.category,
+            requirements=s.requirements,
+            updated_at=s.updated_at,
+        )
+        for s in skills
+    ]
+
+
+@admin_router.put("/platform-skills/{skill_name}/visibility")
+async def admin_update_platform_skill_visibility(
+    skill_name: str,
+    req: UpdatePlatformSkillVisibilityRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update platform skill visibility."""
+    skill = (await db.execute(
+        select(PlatformSkillVisibility).where(PlatformSkillVisibility.skill_name == skill_name)
+    )).scalar_one_or_none()
+
+    if skill is None:
+        raise HTTPException(status_code=404, detail="Platform skill not found")
+
+    skill.is_visible = req.is_visible
+    await db.commit()
+    return {"ok": True, "skill_name": skill_name, "is_visible": req.is_visible}
+
+
+@admin_router.post("/platform-skills/sync")
+async def admin_sync_platform_skills(
+    db: AsyncSession = Depends(get_db),
+):
+    """Sync platform skills from filesystem to database.
+
+    Scans the curated-skills directory for platform skills and creates
+    visibility records for any new skills found.
+    """
+    curated_dir = Path(settings.curated_skills_dir)
+    if not curated_dir.exists():
+        return {"ok": True, "added": 0}
+
+    added = 0
+    for skill_dir in curated_dir.iterdir():
+        if not skill_dir.is_dir():
+            continue
+
+        skill_name = skill_dir.name
+        skill_md = skill_dir / "SKILL.md"
+        if not skill_md.exists():
+            continue
+
+        # Check if already exists
+        existing = (await db.execute(
+            select(PlatformSkillVisibility).where(PlatformSkillVisibility.skill_name == skill_name)
+        )).scalar_one_or_none()
+
+        if existing is None:
+            # Parse description from SKILL.md
+            try:
+                content = skill_md.read_text(encoding='utf-8')
+                # Extract description from frontmatter
+                desc_match = re.search(r'^description:\s*(.+)$', content, re.MULTILINE)
+                description = desc_match.group(1).strip() if desc_match else ""
+
+                # Extract requirements from metadata
+                reqs_match = re.search(r'requires.*?bins:\s*\[([^\]]+)\]', content)
+                requirements = reqs_match.group(1) if reqs_match else ""
+            except Exception:
+                description = ""
+                requirements = ""
+
+            skill = PlatformSkillVisibility(
+                skill_name=skill_name,
+                is_visible=True,  # Default to visible
+                description=description,
+                category="general",
+                requirements=requirements,
+            )
+            db.add(skill)
+            added += 1
+
+    await db.commit()
+    return {"ok": True, "added": added}

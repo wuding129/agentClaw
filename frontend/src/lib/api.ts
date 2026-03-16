@@ -734,6 +734,7 @@ export interface PlatformSkill {
   disabled: boolean
   compatible: boolean
   path: string
+  is_visible?: boolean
 }
 
 export async function listPlatformSkills(): Promise<PlatformSkill[]> {
@@ -861,6 +862,34 @@ export async function adminRejectSubmission(id: string, notes?: string): Promise
   return fetchJSON<{ ok: boolean }>(`/api/admin/skills/submissions/${encodeURIComponent(id)}/reject`, {
     method: 'POST',
     body: JSON.stringify({ admin_notes: notes }),
+  })
+}
+
+// Platform skills admin
+export interface AdminPlatformSkill {
+  id: string
+  skill_name: string
+  is_visible: boolean
+  description: string
+  category: string
+  requirements: string
+  updated_at: string
+}
+
+export async function adminListPlatformSkills(): Promise<AdminPlatformSkill[]> {
+  return fetchJSON<AdminPlatformSkill[]>('/api/admin/skills/platform-skills')
+}
+
+export async function adminUpdatePlatformSkillVisibility(skillName: string, isVisible: boolean): Promise<{ ok: boolean }> {
+  return fetchJSON<{ ok: boolean }>(`/api/admin/skills/platform-skills/${encodeURIComponent(skillName)}/visibility`, {
+    method: 'PUT',
+    body: JSON.stringify({ is_visible: isVisible }),
+  })
+}
+
+export async function adminSyncPlatformSkills(): Promise<{ ok: boolean; added: number }> {
+  return fetchJSON<{ ok: boolean; added: number }>('/api/admin/skills/platform-skills/sync', {
+    method: 'POST',
   })
 }
 
