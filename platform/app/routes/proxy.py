@@ -190,17 +190,24 @@ async def proxy_websocket(
             await websocket.close(code=1013, reason="Container gateway not ready")
             return
 
+        # Track last activity for ping/pong
+        last_activity = asyncio.get_event_loop().time()
+
         async def client_to_upstream():
+            nonlocal last_activity
             try:
                 while True:
                     data = await websocket.receive_text()
+                    last_activity = asyncio.get_event_loop().time()
                     await upstream.send(data)
             except (WebSocketDisconnect, Exception):
                 pass
 
         async def upstream_to_client():
+            nonlocal last_activity
             try:
                 async for message in upstream:
+                    last_activity = asyncio.get_event_loop().time()
                     try:
                         await websocket.send_text(message)
                     except RuntimeError:
@@ -208,7 +215,29 @@ async def proxy_websocket(
             except websockets.ConnectionClosed:
                 pass
 
-        tasks = [asyncio.create_task(client_to_upstream()), asyncio.create_task(upstream_to_client())]
+        async def keepalive():
+            """Send periodic pings to keep connection alive."""
+            nonlocal last_activity
+            while True:
+                try:
+                    await asyncio.sleep(30)
+                    now = asyncio.get_event_loop().time()
+                    # If no activity for 30 seconds, send a ping frame
+                    if now - last_activity >= 30:
+                        try:
+                            await upstream.ping()
+                        except Exception:
+                            break
+                except asyncio.CancelledError:
+                    break
+                except Exception:
+                    break
+
+        tasks = [
+            asyncio.create_task(client_to_upstream()),
+            asyncio.create_task(upstream_to_client()),
+            asyncio.create_task(keepalive()),
+        ]
         try:
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             for t in pending:

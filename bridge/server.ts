@@ -160,6 +160,19 @@ export function createServer(client: BridgeGatewayClient, config: BridgeConfig):
       console.error("[ws-relay] Downstream error:", err.message);
       downstreamClients.delete(downstream);
     });
+
+    // Send periodic ping to keep connection alive (prevent proxy timeouts)
+    const pingInterval = setInterval(() => {
+      if (downstream.readyState === WebSocket.OPEN) {
+        downstream.ping();
+      } else {
+        clearInterval(pingInterval);
+      }
+    }, 30000); // 30 seconds
+
+    downstream.on("close", () => {
+      clearInterval(pingInterval);
+    });
   });
 
   return server;
