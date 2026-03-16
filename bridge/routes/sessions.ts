@@ -3,6 +3,16 @@ import type { BridgeGatewayClient } from "../gateway-client.js";
 import { randomUUID } from "node:crypto";
 import { asyncHandler, toOpenclawSessionKey, toFrameclawSessionId, extractTextContent } from "../utils.js";
 
+// ---------------------------------------------------------------------------
+// Constants (to prevent typos and magic values)
+// ---------------------------------------------------------------------------
+
+/** Session visibility scopes */
+const SessionScope = {
+  Self: "self",
+  All: "all",
+} as const;
+
 interface OpenclawSessionRow {
   key: string;
   updatedAt: number | null;
@@ -38,7 +48,7 @@ export function sessionsRoutes(client: BridgeGatewayClient): Router {
     let targetAgentId = agentId;
     if (isAdmin && req.query.agentId) {
       targetAgentId = req.query.agentId as string;
-    } else if (isAdmin && scope === "self") {
+    } else if (isAdmin && scope === SessionScope.Self) {
       // Admin in chat mode: only see own sessions
       targetAgentId = agentId;
     } else if (isAdmin && !req.query.agentId) {

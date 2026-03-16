@@ -3,6 +3,28 @@
 const API_URL = import.meta.env.VITE_API_URL || ''
 
 // ---------------------------------------------------------------------------
+// Constants (to prevent typos and magic values)
+// ---------------------------------------------------------------------------
+
+/** Agent visibility scopes for list operations */
+export const AgentScope = {
+  /** Only current user's agent */
+  Self: 'self' as const,
+  /** All agents (admin only) */
+  All: 'all' as const,
+} as const
+
+export type AgentScopeType = typeof AgentScope[keyof typeof AgentScope]
+
+/** Well-known system agent IDs */
+export const SystemAgents = {
+  Main: 'main',
+  SkillReviewer: 'skill-reviewer',
+} as const
+
+export const SystemAgentIds = [SystemAgents.Main, SystemAgents.SkillReviewer] as const
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -247,7 +269,7 @@ export async function changepassword(
 // Agent functions
 // ---------------------------------------------------------------------------
 
-export async function listAgents(scope?: 'self' | 'all'): Promise<AgentListResult> {
+export async function listAgents(scope?: AgentScopeType): Promise<AgentListResult> {
   const query = scope ? `?scope=${scope}` : ''
   return fetchJSON<AgentListResult>(`/api/openclaw/agents${query}`)
 }
@@ -315,7 +337,7 @@ export async function setAgentFile(
 // Session functions
 // ---------------------------------------------------------------------------
 
-export async function listSessions(agentId?: string, scope?: 'self' | 'all'): Promise<Session[]> {
+export async function listSessions(agentId?: string, scope?: AgentScopeType): Promise<Session[]> {
   const params = new URLSearchParams()
   if (agentId) params.append('agentId', agentId)
   if (scope) params.append('scope', scope)

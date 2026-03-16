@@ -10,6 +10,24 @@ import { asyncHandler, sanitizePath } from "../utils.js";
 
 const require = createRequire(import.meta.url);
 
+// ---------------------------------------------------------------------------
+// Constants (to prevent typos and magic values)
+// ---------------------------------------------------------------------------
+
+/** Agent visibility scopes */
+const AgentScope = {
+  Self: "self",
+  All: "all",
+} as const;
+
+/** Well-known system agent IDs */
+const SystemAgents = {
+  Main: "main",
+  SkillReviewer: "skill-reviewer",
+} as const;
+
+const SystemAgentIds = [SystemAgents.Main, SystemAgents.SkillReviewer];
+
 /**
  * Fetch user info from platform gateway
  */
@@ -86,10 +104,10 @@ export function agentsRoutes(client: BridgeGatewayClient, config: BridgeConfig):
       if (!isAdmin) {
         // Non-admin: only see their own agent (no system agents)
         agents = agents.filter((a) => a.id === agentId);
-      } else if (scope === "self") {
+      } else if (scope === AgentScope.Self) {
         // Admin in chat mode: only see own agent + system agents
         console.log(`[agents] Filtering to self only for admin`);
-        agents = agents.filter((a) => a.id === agentId || systemAgents.includes(a.id));
+        agents = agents.filter((a) => a.id === agentId || SystemAgentIds.includes(a.id as typeof SystemAgentIds[number]));
       }
       // Admin with scope=all or no scope: see all agents (no filtering)
       console.log(`[agents] Returning ${agents.length} agents`);
@@ -101,7 +119,6 @@ export function agentsRoutes(client: BridgeGatewayClient, config: BridgeConfig):
         const users = await fetchAllUsers(gatewayUrl, token);
         const userMap = new Map(users.map((u) => [u.id, u]));
 
-        const systemAgents = ["main", "skill-reviewer"];
         agents = agents.map((agent) => {
           const user = userMap.get(agent.id);
           const isSelf = agent.id === agentId;
@@ -109,7 +126,7 @@ export function agentsRoutes(client: BridgeGatewayClient, config: BridgeConfig):
           if (user) {
             const selfMarker = isSelf ? " [我]" : "";
             displayName = `${user.username}${selfMarker}`;
-          } else if (systemAgents.includes(agent.id)) {
+          } else if (SystemAgentIds.includes(agent.id as typeof SystemAgentIds[number])) {
             // System agents - show as-is
             displayName = agent.id;
           } else {
@@ -249,8 +266,7 @@ export function agentsRoutes(client: BridgeGatewayClient, config: BridgeConfig):
     const deleteFiles = req.query.delete_files === "true";
 
     // Protect system agents from deletion
-    const systemAgents = ["main", "skill-reviewer"];
-    if (systemAgents.includes(agentId)) {
+    if (SystemAgentIds.includes(agentId as typeof SystemAgentIds[number])) {
       res.status(403).json({ detail: "System agent cannot be deleted" });
       return;
     }

@@ -22,6 +22,7 @@ import {
   listAgents,
   uploadFileToWorkspace,
   getAccessToken,
+  AgentScope,
 } from '../lib/api'
 import type { Session, SessionDetail, AgentInfo } from '../lib/api'
 
@@ -111,8 +112,8 @@ export default function Chat() {
     setSessionsLoading(true)
     try {
       const [sessionsResult, agentsResult] = await Promise.all([
-        listSessions(undefined, 'self'),
-        listAgents('self')
+        listSessions(undefined, AgentScope.Self),
+        listAgents(AgentScope.Self)
       ])
       setSessions(sessionsResult)
       setAgents(agentsResult.agents || [])
@@ -174,7 +175,7 @@ export default function Chat() {
     setShowNewSession(true)
     setAgentsLoading(true)
     try {
-      const result = await listAgents('self')
+      const result = await listAgents(AgentScope.Self)
       setAgents(result.agents || [])
       setDefaultAgentId(result.defaultId || '')
     } catch {
