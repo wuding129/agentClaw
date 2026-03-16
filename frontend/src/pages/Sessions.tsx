@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { listSessions, deleteSession, getSession, listAgents } from '../lib/api'
 import type { Session, SessionDetail, AgentInfo } from '../lib/api'
 import {
@@ -23,6 +23,7 @@ export default function Sessions() {
   const [agents, setAgents] = useState<AgentInfo[]>([])
   const [selectedAgentId, setSelectedAgentId] = useState<string>('')
   const [isAdmin, setIsAdmin] = useState(false)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
   const fetchSessionList = () => {
     setLoading(true)
@@ -56,6 +57,13 @@ export default function Sessions() {
   useEffect(() => {
     fetchSessionList()
   }, [selectedAgentId])
+
+  // Auto-scroll to bottom when detail loads or updates
+  useEffect(() => {
+    if (!detailLoading && messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+    }
+  }, [detail, detailLoading])
 
   const handleDelete = async (key: string) => {
     if (!confirm('确定删除该会话？')) return
@@ -225,7 +233,7 @@ export default function Sessions() {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
             {detailLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 size={20} className="animate-spin text-accent-blue" />
