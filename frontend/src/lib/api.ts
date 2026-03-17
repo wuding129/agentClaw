@@ -720,10 +720,12 @@ export interface SkillSubmission {
   skill_name: string
   description: string
   source_url: string | null
+  file_path: string | null
   status: string
-  ai_review_result: SkillReviewResult | null
+  ai_review_result: string | null
   admin_notes: string | null
   reviewed_by: string | null
+  version: string | null
   created_at: string
   updated_at: string
 }
@@ -869,6 +871,10 @@ export async function adminApproveSubmission(id: string, notes?: string): Promis
     method: 'POST',
     body: JSON.stringify({ admin_notes: notes }),
   })
+}
+
+export async function adminGetSubmissionContent(id: string): Promise<{ content: string; source: string }> {
+  return fetchJSON<{ content: string; source: string }>(`/api/admin/skills/submissions/${encodeURIComponent(id)}/content`)
 }
 
 export async function adminRejectSubmission(id: string, notes?: string): Promise<{ ok: boolean }> {

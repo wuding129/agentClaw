@@ -160,33 +160,33 @@ def _read_skill_files(skill_name: str) -> dict[str, str]:
     return files
 
 
-async def _install_to_agent(user_id: str, skill_name: str) -> bool:
-    """Install a curated skill to the user's agent via Bridge API.
+async def _install_to_agent(agent_id: str, skill_name: str, bridge_url: str) -> bool:
+    """Install a curated skill (from local files) to the user's agent via Bridge API.
 
     Returns True if successful, False otherwise.
     """
     files = _read_skill_files(skill_name)
     if not files:
-        raise HTTPException(status_code=400, detail=f"No readable files found in skill: {skill_name}")
-
-    bridge_url = await _get_bridge_url()
+        return False
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            # Install each file to the agent's skills directory
             for rel_path, content in files.items():
-                # Use agents.files.set to create the file in agent's workspace
                 resp = await client.put(
-                    f"{bridge_url}/api/agents/{user_id}/files/skills/{skill_name}/{rel_path}",
+                    f"{bridge_url}/api/agents/{agent_id}/files/skills/{skill_name}/{rel_path}",
                     json={"content": content},
-                    headers={"x-agent-id": user_id},
+                    headers={
+                        "X-Agent-Id": agent_id,
+                        "X-Agent-Id-Sig": _sign_agent_id(agent_id),
+                        "X-Is-Admin": "true",
+                    },
                 )
                 if resp.status_code not in (200, 201):
                     print(f"[skills] Failed to install file {rel_path}: {resp.status_code}")
                     return False
-            return True
+        return True
     except Exception as e:
-        print(f"[skills] Failed to install skill {skill_name} to agent {user_id}: {e}")
+        print(f"[skills] Failed to install skill {skill_name} to agent {agent_id}: {e}")
         return False
 
 
@@ -351,7 +351,38 @@ async def install_curated_skill(
     if skill is None:
         raise HTTPException(status_code=404, detail="Curated skill not found")
 
-    success = await _install_to_agent(user.id, skill.name)
+    # Get user's default agent
+    user_agent = (await db.execute(
+        select(UserAgent).where(
+            UserAgent.user_id == user.id,
+            UserAgent.is_default == True,
+            UserAgent.status == "active",
+        )
+    )).scalar_one_or_none()
+    if user_agent is None:
+        raise HTTPException(status_code=400, detail="No default agent found. Please create an agent first.")
+
+    agent_id = user_agent.openclaw_agent_id
+    bridge_url = await _get_bridge_url()
+
+    # Try local curated files first; fall back to bridge copy (platform/builtin skills)
+    if _skill_dir(skill.name).is_dir():
+        success = await _install_to_agent(agent_id, skill.name, bridge_url)
+    else:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    f"{bridge_url}/api/skills/{skill.name}/copy",
+                    headers={
+                        "X-Agent-Id": agent_id,
+                        "X-Agent-Id-Sig": _sign_agent_id(agent_id),
+                    },
+                )
+                success = resp.status_code == 200
+        except Exception as e:
+            logger.error(f"[skills] Failed to install curated skill {skill.name}: {e}")
+            success = False
+
     if not success:
         raise HTTPException(status_code=500, detail="Failed to install skill. Please try again later.")
 
@@ -860,12 +891,47 @@ async def admin_list_submissions(
         SkillSubmissionOut(
             id=s.id, user_id=s.user_id, skill_name=s.skill_name,
             description=s.description, source_url=s.source_url,
-            status=s.status, admin_notes=s.admin_notes,
-            reviewed_by=s.reviewed_by,
+            file_path=s.file_path, status=s.status,
+            ai_review_result=s.ai_review_result,
+            admin_notes=s.admin_notes, reviewed_by=s.reviewed_by,
+            version=s.version,
             created_at=s.created_at, updated_at=s.updated_at,
         )
         for s in rows
     ]
+
+
+@admin_router.get("/submissions/{submission_id}/content")
+async def admin_get_submission_content(
+    submission_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get SKILL.md content for a submission (from ReviewTask or zip file)."""
+    # Try ReviewTask first (already extracted during upload)
+    task = (await db.execute(
+        select(ReviewTask).where(ReviewTask.submission_id == submission_id)
+    )).scalar_one_or_none()
+    if task and task.skill_content:
+        return {"content": task.skill_content, "source": "review_task"}
+
+    # Fall back to reading from zip file
+    sub = (await db.execute(
+        select(SkillSubmission).where(SkillSubmission.id == submission_id)
+    )).scalar_one_or_none()
+    if sub is None:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    if sub.file_path and Path(sub.file_path).exists():
+        try:
+            with zipfile.ZipFile(sub.file_path) as zf:
+                for name in zf.namelist():
+                    if name.endswith("SKILL.md"):
+                        content = zf.read(name).decode("utf-8")
+                        return {"content": content, "source": "zip"}
+        except Exception:
+            pass
+
+    raise HTTPException(status_code=404, detail="Skill content not available")
 
 
 @admin_router.post("/submissions/{submission_id}/approve")

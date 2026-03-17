@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import {
   adminListCuratedSkills, adminUploadCuratedSkill, adminUpdateCuratedSkill,
   adminDeleteCuratedSkill, adminListSubmissions, adminApproveSubmission,
-  adminRejectSubmission, adminListPlatformSkills, adminUpdatePlatformSkillVisibility,
-  adminSyncPlatformSkills,
+  adminRejectSubmission, adminGetSubmissionContent, adminListPlatformSkills,
+  adminUpdatePlatformSkillVisibility, adminSyncPlatformSkills,
 } from '../lib/api'
 import type { CuratedSkill, SkillSubmission, AdminPlatformSkill } from '../lib/api'
 import {
   Loader2, Plus, Trash2, Star, Check, X, Upload,
   ChevronUp, Edit2, Eye, EyeOff, RefreshCw, Package,
+  ChevronDown, FileText, Bot, ExternalLink,
 } from 'lucide-react'
 
 type AdminTab = 'curated' | 'platform' | 'submissions'
@@ -49,6 +50,9 @@ export default function AdminSkills() {
   // Review
   const [reviewNotes, setReviewNotes] = useState('')
   const [reviewing, setReviewing] = useState<string | null>(null)
+  const [expandedSub, setExpandedSub] = useState<string | null>(null)
+  const [skillContent, setSkillContent] = useState<Record<string, string>>({})
+  const [loadingContent, setLoadingContent] = useState<string | null>(null)
 
   const refreshSkills = () => {
     adminListCuratedSkills().then(setSkills).catch(() => setSkills([])).finally(() => setLoading(false))
@@ -163,6 +167,19 @@ export default function AdminSkills() {
       // ignore
     } finally {
       setReviewing(null)
+    }
+  }
+
+  const handleLoadContent = async (id: string) => {
+    if (skillContent[id] || loadingContent === id) return
+    setLoadingContent(id)
+    try {
+      const res = await adminGetSubmissionContent(id)
+      setSkillContent(prev => ({ ...prev, [id]: res.content }))
+    } catch {
+      setSkillContent(prev => ({ ...prev, [id]: '(无法获取技能内容)' }))
+    } finally {
+      setLoadingContent(null)
     }
   }
 
@@ -494,58 +511,152 @@ export default function AdminSkills() {
             </div>
           ) : (
             <div className="space-y-3">
-              {submissions.map(sub => (
-                <div key={sub.id} className="rounded-xl border border-border-default bg-bg-surface p-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-text-primary">{sub.skill_name}</span>
-                        <span className={`rounded px-2 py-0.5 text-xs ${
-                          sub.status === 'approved' ? 'bg-accent-green/10 text-accent-green' :
-                          sub.status === 'rejected' ? 'bg-accent-red/10 text-accent-red' :
-                          'bg-accent-yellow/10 text-accent-yellow'
-                        }`}>
-                          {sub.status === 'approved' ? '已通过' : sub.status === 'rejected' ? '已拒绝' : '待审核'}
-                        </span>
-                      </div>
-                      {sub.description && <p className="mt-1 text-xs text-text-secondary">{sub.description}</p>}
-                      {sub.source_url && <p className="mt-0.5 text-xs text-accent-blue/70">{sub.source_url}</p>}
-                      <p className="mt-1 text-xs text-text-secondary">
-                        提交者: {sub.user_id.slice(0, 8)}... | {new Date(sub.created_at).toLocaleDateString()}
-                      </p>
-                      {sub.admin_notes && (
-                        <p className="mt-1 text-xs text-text-secondary">备注: {sub.admin_notes}</p>
-                      )}
-                    </div>
-                  </div>
+              {submissions.map(sub => {
+                const isExpanded = expandedSub === sub.id
+                const aiReview = sub.ai_review_result ? (() => {
+                  try { return JSON.parse(sub.ai_review_result) } catch { return null }
+                })() : null
 
-                  {sub.status === 'pending' && (
-                    <div className="mt-3 flex items-center gap-2">
-                      <input
-                        type="text"
-                        placeholder="审核备注（可选）"
-                        value={reviewing === sub.id ? reviewNotes : ''}
-                        onChange={e => { setReviewing(sub.id); setReviewNotes(e.target.value) }}
-                        onFocus={() => setReviewing(sub.id)}
-                        className="flex-1 rounded border border-border-default bg-bg-base px-2 py-1 text-xs text-text-primary outline-none"
-                      />
-                      <button
-                        onClick={() => handleApprove(sub.id)}
-                        disabled={reviewing === sub.id && reviewing !== sub.id}
-                        className="flex items-center gap-1 rounded bg-accent-green/20 px-3 py-1.5 text-xs font-medium text-accent-green hover:bg-accent-green/30"
-                      >
-                        <Check size={12} /> 通过
-                      </button>
-                      <button
-                        onClick={() => handleReject(sub.id)}
-                        className="flex items-center gap-1 rounded bg-accent-red/20 px-3 py-1.5 text-xs font-medium text-accent-red hover:bg-accent-red/30"
-                      >
-                        <X size={12} /> 拒绝
-                      </button>
+                return (
+                  <div key={sub.id} className="rounded-xl border border-border-default bg-bg-surface overflow-hidden">
+                    {/* Header row */}
+                    <div
+                      className="flex items-center gap-3 px-5 py-4 cursor-pointer hover:bg-bg-base/50 transition-colors"
+                      onClick={() => {
+                        const next = isExpanded ? null : sub.id
+                        setExpandedSub(next)
+                        if (next) handleLoadContent(next)
+                      }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-text-primary">{sub.skill_name}</span>
+                          <span className={`rounded px-2 py-0.5 text-xs font-medium ${
+                            sub.status === 'approved' ? 'bg-accent-green/10 text-accent-green' :
+                            sub.status === 'rejected' ? 'bg-accent-red/10 text-accent-red' :
+                            sub.status === 'ai_reviewed' ? 'bg-accent-blue/10 text-accent-blue' :
+                            'bg-accent-yellow/10 text-accent-yellow'
+                          }`}>
+                            {sub.status === 'approved' ? '已通过' :
+                             sub.status === 'rejected' ? '已拒绝' :
+                             sub.status === 'ai_reviewed' ? 'AI已审' : '待审核'}
+                          </span>
+                          {sub.file_path && (
+                            <span className="flex items-center gap-1 rounded bg-bg-base px-1.5 py-0.5 text-xs text-text-secondary">
+                              <FileText size={10} /> 含文件
+                            </span>
+                          )}
+                          {aiReview && (
+                            <span className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ${
+                              aiReview.approved ? 'bg-accent-green/10 text-accent-green' : 'bg-accent-red/10 text-accent-red'
+                            }`}>
+                              <Bot size={10} /> AI {aiReview.approved ? '推荐通过' : '建议拒绝'} {aiReview.score != null ? `(${aiReview.score})` : ''}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-3 text-xs text-text-secondary">
+                          <span>提交者: {sub.user_id.slice(0, 8)}...</span>
+                          <span>{new Date(sub.created_at).toLocaleString()}</span>
+                          {sub.description && <span className="truncate max-w-xs">{sub.description}</span>}
+                        </div>
+                      </div>
+                      {isExpanded ? <ChevronUp size={16} className="text-text-secondary shrink-0" /> : <ChevronDown size={16} className="text-text-secondary shrink-0" />}
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    {/* Expanded details */}
+                    {isExpanded && (
+                      <div className="border-t border-border-default px-5 py-4 space-y-4">
+
+                        {/* Source URL */}
+                        {sub.source_url && (
+                          <div>
+                            <p className="text-xs font-medium text-text-secondary mb-1">来源链接</p>
+                            <a href={sub.source_url} target="_blank" rel="noreferrer"
+                              className="flex items-center gap-1 text-xs text-accent-blue hover:underline">
+                              <ExternalLink size={12} /> {sub.source_url}
+                            </a>
+                          </div>
+                        )}
+
+                        {/* AI Review Result */}
+                        {aiReview && (
+                          <div>
+                            <p className="text-xs font-medium text-text-secondary mb-1.5">AI 审核结果</p>
+                            <div className={`rounded-lg border px-4 py-3 text-xs space-y-2 ${
+                              aiReview.approved ? 'border-accent-green/30 bg-accent-green/5' : 'border-accent-red/30 bg-accent-red/5'
+                            }`}>
+                              {aiReview.summary && <p className="text-text-primary">{aiReview.summary}</p>}
+                              {aiReview.issues?.length > 0 && (
+                                <div className="space-y-1">
+                                  {aiReview.issues.map((issue: any, i: number) => (
+                                    <div key={i} className="flex gap-2">
+                                      <span className={`shrink-0 font-medium ${
+                                        issue.severity === 'critical' ? 'text-accent-red' :
+                                        issue.severity === 'major' ? 'text-accent-yellow' : 'text-text-secondary'
+                                      }`}>[{issue.severity}]</span>
+                                      <span className="text-text-secondary">{issue.message}{issue.suggestion ? ` — ${issue.suggestion}` : ''}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* SKILL.md content */}
+                        <div>
+                          <p className="text-xs font-medium text-text-secondary mb-1.5">技能内容 (SKILL.md)</p>
+                          {loadingContent === sub.id ? (
+                            <div className="flex items-center gap-2 text-xs text-text-secondary">
+                              <Loader2 size={12} className="animate-spin" /> 加载中...
+                            </div>
+                          ) : skillContent[sub.id] ? (
+                            <pre className="rounded-lg bg-bg-base border border-border-default p-3 text-xs text-text-primary overflow-auto max-h-64 whitespace-pre-wrap font-mono">
+                              {skillContent[sub.id]}
+                            </pre>
+                          ) : (
+                            <p className="text-xs text-text-secondary">无可用内容</p>
+                          )}
+                        </div>
+
+                        {/* Admin notes */}
+                        {sub.admin_notes && (
+                          <div>
+                            <p className="text-xs font-medium text-text-secondary mb-1">管理员备注</p>
+                            <p className="text-xs text-text-primary">{sub.admin_notes}</p>
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        {sub.status !== 'approved' && sub.status !== 'rejected' && (
+                          <div className="flex items-center gap-2 pt-1 border-t border-border-default">
+                            <input
+                              type="text"
+                              placeholder="审核备注（可选）"
+                              value={reviewing === sub.id ? reviewNotes : ''}
+                              onChange={e => { setReviewing(sub.id); setReviewNotes(e.target.value) }}
+                              onFocus={() => setReviewing(sub.id)}
+                              className="flex-1 rounded border border-border-default bg-bg-base px-2 py-1.5 text-xs text-text-primary outline-none focus:border-accent-blue"
+                            />
+                            <button
+                              onClick={() => handleApprove(sub.id)}
+                              className="flex items-center gap-1 rounded bg-accent-green/20 px-3 py-1.5 text-xs font-medium text-accent-green hover:bg-accent-green/30"
+                            >
+                              <Check size={12} /> 通过
+                            </button>
+                            <button
+                              onClick={() => handleReject(sub.id)}
+                              className="flex items-center gap-1 rounded bg-accent-red/20 px-3 py-1.5 text-xs font-medium text-accent-red hover:bg-accent-red/30"
+                            >
+                              <X size={12} /> 拒绝
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

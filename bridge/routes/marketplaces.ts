@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -94,7 +95,7 @@ function getCachePath(name: string): string {
   return path.join(getMarketplacesDir(), "cache", name);
 }
 
-export function marketplacesRoutes(_config: BridgeConfig): Router {
+export function marketplacesRoutes(config: BridgeConfig): Router {
   const router = Router();
 
   // GET /api/marketplaces
@@ -331,13 +332,43 @@ export function marketplacesRoutes(_config: BridgeConfig): Router {
       return;
     }
 
+    // Resolve per-user workspace for multi-tenant isolation
+    const headerAgentId = req.headers["x-agent-id"] as string | undefined;
+    const headerSig = req.headers["x-agent-id-sig"] as string | undefined;
+    let agentId = "main";
+    if (headerAgentId && /^[a-z0-9][a-z0-9_-]*$/.test(headerAgentId)) {
+      if (headerAgentId === "main") {
+        agentId = "main";
+      } else {
+        const expected = crypto
+          .createHmac("sha256", config.bridgeToken)
+          .update(`${headerAgentId}:${config.bridgeToken}`)
+          .digest("hex")
+          .slice(0, 16);
+        if (headerSig === expected) {
+          agentId = headerAgentId;
+        }
+      }
+    }
+    const workspacePath = agentId === "main"
+      ? config.workspacePath
+      : path.join(config.openclawHome, `workspace-${agentId}`);
+    fs.mkdirSync(workspacePath, { recursive: true });
+
+    // skills add -g always installs to $HOME/.openclaw/skills/ regardless of OPENCLAW_HOME.
+    // After install, move the skill(s) into the user's workspace/skills/ directory.
+    const homeSkillsDir = path.join(os.homedir(), ".openclaw", "skills");
+    const destSkillsDir = path.join(workspacePath, "skills");
+
+    // Snapshot what's already in $HOME/.openclaw/skills before install
+    const before = new Set(fs.existsSync(homeSkillsDir) ? fs.readdirSync(homeSkillsDir) : []);
+
     try {
       const stdout = await new Promise<string>((resolve, reject) => {
         exec(
           `npx --yes skills add ${slug} -g -y --copy`,
           { timeout: 180000, env: { ...process.env, NO_COLOR: "1" } },
           (err, stdout, stderr) => {
-            // npm warnings go to stderr but are not real errors
             const cleanStderr = stripAnsi(stderr || "")
               .split("\n")
               .filter((l) => !l.startsWith("npm warn") && l.trim())
@@ -348,6 +379,19 @@ export function marketplacesRoutes(_config: BridgeConfig): Router {
           },
         );
       });
+
+      // Move newly installed skill(s) from $HOME/.openclaw/skills/ to user workspace
+      fs.mkdirSync(destSkillsDir, { recursive: true });
+      if (fs.existsSync(homeSkillsDir)) {
+        for (const entry of fs.readdirSync(homeSkillsDir)) {
+          if (before.has(entry)) continue; // skip pre-existing
+          const src = path.join(homeSkillsDir, entry);
+          const dest = path.join(destSkillsDir, entry);
+          if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true });
+          fs.renameSync(src, dest);
+        }
+      }
+
       res.json({ ok: true, output: stdout.trim() });
     } catch (err) {
       res.status(500).json({ detail: (err as Error).message });

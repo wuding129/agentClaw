@@ -226,7 +226,7 @@ export default function SkillStore() {
   const tabs: { key: Tab; label: string }[] = [
     { key: 'curated', label: '精选推荐' },
     { key: 'platform', label: '平台技能' },
-    { key: 'search', label: '商店搜索' },
+    { key: 'search', label: '技能搜索' },
     { key: 'installed', label: '已安装' },
   ]
 
@@ -404,7 +404,7 @@ export default function SkillStore() {
               <div className="mt-4 space-y-2">
                 <h3 className="text-sm font-medium text-text-secondary">我的提交</h3>
                 {submissions.map(s => {
-                  const aiResult = s.ai_review_result
+                  const aiResult = s.ai_review_result ? (() => { try { return JSON.parse(s.ai_review_result) } catch { return null } })() : null
                   return (
                     <div key={s.id} className="rounded-lg border border-border-default bg-bg-surface px-4 py-3 shadow-card">
                       <div className="flex items-center justify-between">
@@ -434,7 +434,7 @@ export default function SkillStore() {
                         <div className="mt-2 pt-2 border-t border-border-default/50">
                           <p className="text-xs text-text-secondary mb-1">AI审核建议：</p>
                           <ul className="space-y-1">
-                            {aiResult.issues.slice(0, 2).map((issue, idx) => (
+                            {aiResult.issues.slice(0, 2).map((issue: any, idx: number) => (
                               <li key={idx} className="text-xs text-text-secondary">
                                 <span className={issue.severity === 'critical' ? 'text-accent-red' : issue.severity === 'major' ? 'text-accent-yellow' : 'text-text-secondary'}>
                                   [{issue.severity === 'critical' ? '关键' : issue.severity === 'major' ? '重要' : '建议'}]
@@ -534,7 +534,7 @@ export default function SkillStore() {
               <Search size={16} className="text-text-secondary" />
               <input
                 type="text"
-                placeholder="搜索技能，例如：web scraping, react, testing..."
+                placeholder="搜索技能名称或描述..."
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 className="flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-tertiary"
@@ -550,69 +550,133 @@ export default function SkillStore() {
             </button>
           </form>
 
-          <p className="mb-4 text-xs text-text-secondary">
-            搜索来自 <a href="https://skills.sh/" target="_blank" rel="noreferrer" className="text-accent-blue hover:underline">skills.sh</a> 的技能
-          </p>
+          {searched && (() => {
+            const q = query.trim().toLowerCase()
+            const matchedPlatform = platformSkills.filter(s =>
+              s.name.toLowerCase().includes(q) || (s.description || '').toLowerCase().includes(q)
+            )
+            const matchedCurated = curated.filter(s =>
+              s.name.toLowerCase().includes(q) || (s.description || '').toLowerCase().includes(q)
+            )
+            const internalCount = matchedPlatform.length + matchedCurated.length
 
-          {searched && (
-            <div>
-              <h2 className="mb-3 text-base font-semibold text-text-primary">
-                搜索结果
-                {results.length > 0 && <span className="ml-2 text-sm font-normal text-text-secondary">({results.length} 个技能)</span>}
-              </h2>
-              {searching ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 size={24} className="animate-spin text-accent-blue" />
-                  <span className="ml-3 text-sm text-text-secondary">正在搜索...</span>
-                </div>
-              ) : results.length === 0 ? (
-                <div className="rounded-xl border border-border-default bg-bg-surface p-8 text-center text-sm text-text-secondary shadow-card">
-                  未找到相关技能，请尝试其他关键词
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {results.map(r => {
-                    const isInstalled = installed.has(r.slug)
-                    const isInstalling = installing === r.slug
-                    return (
-                      <div key={r.slug} className="flex items-center justify-between rounded-xl border border-border-default bg-bg-surface px-5 py-3.5 hover:border-accent-blue/30 transition-colors shadow-card">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-text-primary truncate">{r.slug}</span>
-                            <span className="shrink-0 rounded bg-bg-base px-2 py-0.5 text-xs text-text-secondary">{r.installs}</span>
+            return (
+              <div className="space-y-6">
+                {/* Internal: platform + curated */}
+                {internalCount > 0 && (
+                  <div>
+                    <div className="mb-3 flex items-center gap-2">
+                      <Package size={15} className="text-accent-blue" />
+                      <h2 className="text-sm font-semibold text-text-primary">平台 & 精选</h2>
+                      <span className="text-xs text-text-secondary">({internalCount})</span>
+                    </div>
+                    <div className="space-y-2">
+                      {matchedPlatform.map(skill => {
+                        const isInstalling = installingPlatform === skill.name
+                        const isInstalled = skills.some(s => s.name === skill.name && s.source === 'workspace')
+                        return (
+                          <div key={`p-${skill.name}`} className="flex items-center justify-between rounded-xl border border-border-default bg-bg-surface px-5 py-3.5 hover:border-accent-blue/30 transition-colors shadow-card">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-text-primary truncate">{skill.name}</span>
+                                <span className="shrink-0 rounded bg-accent-blue/10 px-1.5 py-0.5 text-[10px] text-accent-blue">平台内置</span>
+                              </div>
+                              {skill.description && <p className="mt-0.5 text-xs text-text-secondary truncate">{skill.description}</p>}
+                            </div>
+                            <button
+                              onClick={() => handleInstallPlatform(skill.name)}
+                              disabled={isInstalling || isInstalled}
+                              className={`ml-4 flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium transition-colors ${
+                                isInstalled ? 'bg-accent-green/10 text-accent-green' : 'bg-accent-blue/10 text-accent-blue hover:bg-accent-blue/20 disabled:opacity-50'
+                              }`}
+                            >
+                              {isInstalling ? <><Loader2 size={13} className="animate-spin" /> 安装中...</> : isInstalled ? <><Check size={13} /> 已安装</> : <><Download size={13} /> 安装</>}
+                            </button>
                           </div>
-                          <a
-                            href={r.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-1 flex items-center gap-1 text-xs text-accent-blue/70 hover:text-accent-blue truncate"
-                          >
-                            <ExternalLink size={11} />
-                            {r.url}
-                          </a>
-                        </div>
-                        <button
-                          onClick={() => handleInstall(r.slug)}
-                          disabled={isInstalling || isInstalled}
-                          className={`ml-4 flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium transition-colors ${
-                            isInstalled
-                              ? 'bg-accent-green/10 text-accent-green'
-                              : 'bg-accent-blue/10 text-accent-blue hover:bg-accent-blue/20 disabled:opacity-50'
-                          }`}
-                        >
-                          {isInstalling ? (
-                            <><Loader2 size={13} className="animate-spin" /> 安装中...</>
-                          ) : isInstalled ? (
-                            <><Check size={13} /> 已安装</>
-                          ) : (
-                            <><Download size={13} /> 安装</>
-                          )}
-                        </button>
-                      </div>
-                    )
-                  })}
+                        )
+                      })}
+                      {matchedCurated.map(skill => {
+                        const isInstalling = installingCurated === skill.id
+                        return (
+                          <div key={`c-${skill.id}`} className="flex items-center justify-between rounded-xl border border-border-default bg-bg-surface px-5 py-3.5 hover:border-accent-blue/30 transition-colors shadow-card">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-text-primary truncate">{skill.name}</span>
+                                <span className="shrink-0 rounded bg-accent-yellow/10 px-1.5 py-0.5 text-[10px] text-accent-yellow">精选</span>
+                              </div>
+                              {skill.description && <p className="mt-0.5 text-xs text-text-secondary truncate">{skill.description}</p>}
+                            </div>
+                            <button
+                              onClick={() => handleInstallCurated(skill.id)}
+                              disabled={isInstalling || skill.installed}
+                              className={`ml-4 flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium transition-colors ${
+                                skill.installed ? 'bg-accent-green/10 text-accent-green' : 'bg-accent-blue/10 text-accent-blue hover:bg-accent-blue/20 disabled:opacity-50'
+                              }`}
+                            >
+                              {isInstalling ? <><Loader2 size={13} className="animate-spin" /> 安装中...</> : skill.installed ? <><Check size={13} /> 已安装</> : <><Download size={13} /> 安装</>}
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* External: skills.sh */}
+                <div>
+                  <div className="mb-3 flex items-center gap-2">
+                    <ExternalLink size={15} className="text-text-secondary" />
+                    <h2 className="text-sm font-semibold text-text-primary">来自第三方</h2>
+                    <a href="https://skills.sh/" target="_blank" rel="noreferrer" className="text-xs text-accent-blue hover:underline">skills.sh</a>
+                  </div>
+                  {searching ? (
+                    <div className="flex items-center gap-3 py-6 text-text-secondary">
+                      <Loader2 size={18} className="animate-spin text-accent-blue" />
+                      <span className="text-sm">正在搜索...</span>
+                    </div>
+                  ) : results.length === 0 ? (
+                    <div className="rounded-xl border border-border-default bg-bg-surface px-5 py-6 text-center text-sm text-text-secondary shadow-card">
+                      {internalCount > 0 ? '第三方未找到相关技能' : '未找到相关技能，请尝试其他关键词'}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {results.map(r => {
+                        const isInstalled = installed.has(r.slug)
+                        const isInstalling = installing === r.slug
+                        return (
+                          <div key={r.slug} className="flex items-center justify-between rounded-xl border border-border-default bg-bg-surface px-5 py-3.5 hover:border-accent-blue/30 transition-colors shadow-card">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-text-primary truncate">{r.slug}</span>
+                                <span className="shrink-0 rounded bg-bg-base px-2 py-0.5 text-xs text-text-secondary">{r.installs} 安装</span>
+                              </div>
+                              <a href={r.url} target="_blank" rel="noreferrer" className="mt-0.5 flex items-center gap-1 text-xs text-accent-blue/70 hover:text-accent-blue truncate">
+                                <ExternalLink size={10} />{r.url}
+                              </a>
+                            </div>
+                            <button
+                              onClick={() => handleInstall(r.slug)}
+                              disabled={isInstalling || isInstalled}
+                              className={`ml-4 flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium transition-colors ${
+                                isInstalled ? 'bg-accent-green/10 text-accent-green' : 'bg-accent-blue/10 text-accent-blue hover:bg-accent-blue/20 disabled:opacity-50'
+                              }`}
+                            >
+                              {isInstalling ? <><Loader2 size={13} className="animate-spin" /> 安装中...</> : isInstalled ? <><Check size={13} /> 已安装</> : <><Download size={13} /> 安装</>}
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
+            )
+          })()}
+
+          {!searched && (
+            <div className="rounded-xl border border-border-default bg-bg-surface px-5 py-12 text-center text-sm text-text-secondary shadow-card">
+              <Search size={32} className="mx-auto mb-3 opacity-30" />
+              输入关键词搜索平台内置、精选及第三方技能
             </div>
           )}
         </div>
