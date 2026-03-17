@@ -52,7 +52,6 @@ npm-debug.log
 yarn-error.log
 **/Pods/
 vendor/
-.env*
 cache
 .env_dev
 .env_prod
