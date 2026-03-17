@@ -75,7 +75,7 @@ async def _create_default_agent_for_user(
                 print(f"[auth] Failed to create agent in OpenClaw for {user_id}: {resp.status_code} - {resp.text}")
                 return None
 
-            # For regular users, set the SkillClaw SOUL.md
+            # For regular users, set the AgentClaw SOUL.md
             if not is_admin:
                 soul_resp = await client.put(
                     f"{bridge_url}/api/agents/{openclaw_agent_id}/files/SOUL.md",

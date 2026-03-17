@@ -84,7 +84,7 @@ export function writeOpenclawConfig(cfg: BridgeConfig): void {
           workspaceAccess: "rw",
           docker: {
             // 镜像配置 - 使用预装工具的镜像
-            image: "openclaw-sandbox:skillclaw",
+            image: "openclaw-sandbox:agentclaw",
             // 网络和权限 - skill agent 需要网络访问和安装工具
             readOnlyRoot: false,
             network: "bridge",

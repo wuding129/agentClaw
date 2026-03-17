@@ -80,7 +80,7 @@ export default function Sidebar() {
           SC
         </div>
         <div>
-          <div className="text-sm font-semibold text-text-primary">SkillClaw</div>
+          <div className="text-sm font-semibold text-text-primary">AgentClaw</div>
           <div className="text-xs text-text-secondary">技能商店平台 v2026.3</div>
         </div>
       </div>

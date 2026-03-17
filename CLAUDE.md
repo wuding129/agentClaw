@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SkillClaw is a multi-tenant AI skill development platform built on OpenClaw. It uses a **multi-agent architecture** where all users share a single OpenClaw Gateway instance, with each user getting an Agent that runs in an isolated Docker sandbox container.
+AgentClaw is a multi-tenant AI skill development platform built on OpenClaw. It uses a **multi-agent architecture** where all users share a single OpenClaw Gateway instance, with each user getting an Agent that runs in an isolated Docker sandbox container.
 
 **Architecture Flow:**
 ```
@@ -268,7 +268,7 @@ Sandbox settings in `bridge/config.ts` under `agents.defaults.sandbox`:
   "scope": "agent",
   "workspaceAccess": "rw",
   "docker": {
-    "image": "openclaw-sandbox:skillclaw",
+    "image": "openclaw-sandbox:agentclaw",
     "readOnlyRoot": false,
     "network": "bridge",
     "memory": "2g",
@@ -285,7 +285,7 @@ Sandbox settings in `bridge/config.ts` under `agents.defaults.sandbox`:
 - `sandbox.readOnlyRoot` is invalid — must use `sandbox.docker.readOnlyRoot`
 - `sandbox.tools.fs.workspaceOnly` is invalid (not in schema)
 - File isolation is enforced by scoping each agent to `workspace-<agentId>/`
-- Custom sandbox image `openclaw-sandbox:skillclaw` built from `sandbox/Dockerfile` — preinstalled: Node.js 20, Python 3, pip, pnpm
+- Custom sandbox image `openclaw-sandbox:agentclaw` built from `sandbox/Dockerfile` — preinstalled: Node.js 20, Python 3, pip, pnpm
 
 ## Data Storage
 
@@ -322,16 +322,16 @@ Three types of skills:
 3. Admin approves/rejects via `AdminSkills.tsx`
 4. On approval: skill installed to curated collection + notification sent to user
 
-## SkillClaw Agent Persona
+## AgentClaw Agent Persona
 
-The SOUL.md template for regular users is defined in `platform/app/routes/auth.py` (`SKILLCLAW_SOUL_MD`).
+The SOUL.md template for regular users is defined in `platform/app/routes/auth.py` (`AGENTCLAW_SOUL_MD`).
 
 To update existing agents after changing SOUL.md:
 ```bash
 python3 -c "
 import re, glob, os
 soul = open('platform/app/routes/auth.py').read()
-m = re.search(r\"SKILLCLAW_SOUL_MD = '''(.*?)'''\", soul, re.DOTALL)
+m = re.search(r\"AGENTCLAW_SOUL_MD = '''(.*?)'''\", soul, re.DOTALL)
 if m:
     for ws in glob.glob(os.path.expanduser('~/.openclaw/workspace-*')):
         with open(os.path.join(ws, 'SOUL.md'), 'w') as f: f.write(m.group(1))

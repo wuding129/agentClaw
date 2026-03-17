@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SkillClaw 环境准备脚本（跨平台：macOS / Linux / Windows）。
+"""AgentClaw 环境准备脚本（跨平台：macOS / Linux / Windows）。
 
 检查并自动准备 docker-compose 部署所需的环境：
   1. Docker 守护进程运行状态
@@ -217,13 +217,13 @@ DOCKER_IMAGES = [
 
 
 def main():
-    parser = argparse.ArgumentParser(description="SkillClaw 环境准备脚本")
+    parser = argparse.ArgumentParser(description="AgentClaw 环境准备脚本")
     parser.add_argument("--check", action="store_true", help="仅检查，不自动修复")
     args = parser.parse_args()
     fix = not args.check
 
     platform_label = "Windows" if IS_WINDOWS else ("macOS" if sys.platform == "darwin" else "Linux")
-    print(f"\n{BOLD(f'🔧 SkillClaw 环境准备 ({platform_label})')}")
+    print(f"\n{BOLD(f'🔧 AgentClaw 环境准备 ({platform_label})')}")
     if args.check:
         print(f"  {DIM('模式：仅检查（--check）')}")
     else:

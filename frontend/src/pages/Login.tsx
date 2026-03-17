@@ -39,7 +39,7 @@ export default function Login() {
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-blue">
             <Bot className="h-6 w-6 text-white" />
           </div>
-          <h1 className="text-xl font-semibold text-text-primary">SkillClaw</h1>
+          <h1 className="text-xl font-semibold text-text-primary">AgentClaw</h1>
         </div>
 
         {/* Error */}

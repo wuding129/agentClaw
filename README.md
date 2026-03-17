@@ -1,8 +1,8 @@
-# SkillClaw - 多租户 AI 技能创作平台，面向企业内部的的openclaw架构实践
+# AgentClaw - 多租户 AI 技能创作平台，面向企业内部的的openclaw架构实践
 
 这是我的一个架构实践项目，目的是为企业内部提供一个公共可用的skill生产平台，多租户管理，于是我基于openclaw作为agent核心框架设计了一套。全程指挥我的Claude完成，希望对大家有用。
 
-**SkillClaw** 是一个多租户 AI 技能开发平台。每个用户在独立的 Docker 沙盒中创作、测试、分享可复用的 AI 技能。
+**AgentClaw** 是一个多租户 AI 技能开发平台。每个用户在独立的 Docker 沙盒中创作、测试、分享可复用的 AI 技能。
 
 采用 **frameClaw** 多租户架构 —— 基于 OpenClaw 实现共享实例 + 动态沙盒的租户隔离方案。
 
@@ -17,7 +17,7 @@
 
 ## 系统架构
 
-SkillClaw 采用 **frameClaw** 多租户架构：共享实例 + 动态沙盒：
+AgentClaw 采用 **frameClaw** 多租户架构：共享实例 + 动态沙盒：
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -72,11 +72,11 @@ Platform Gateway (认证/代理)
 - 管理 per-agent workspace 目录
 - 转发 LLM 请求到 Platform Gateway
 
-这样 SkillClaw 可以跟随 OpenClaw 官方版本更新，无需维护 fork。
+这样 AgentClaw 可以跟随 OpenClaw 官方版本更新，无需维护 fork。
 
 ### 多 Agent 设计
 
-OpenClaw 原生支持多 Agent，SkillClaw 利用此能力实现租户隔离：
+OpenClaw 原生支持多 Agent，AgentClaw 利用此能力实现租户隔离：
 
 | 概念 | 说明 |
 |------|------|
@@ -96,7 +96,7 @@ OpenClaw 原生支持多 Agent，SkillClaw 利用此能力实现租户隔离：
     "scope": "agent",        // 每 Agent 独立沙盒
     "workspaceAccess": "rw", // 读写 workspace
     "docker": {
-      "image": "openclaw-sandbox:skillclaw",
+      "image": "openclaw-sandbox:agentclaw",
       "readOnlyRoot": false,
       "network": "bridge",
       "user": "0:0",
@@ -109,7 +109,7 @@ OpenClaw 原生支持多 Agent，SkillClaw 利用此能力实现租户隔离：
 }
 ```
 
-## 快速开始（运行 SkillClaw 示例）
+## 快速开始（运行 AgentClaw 示例）
 
 ### 环境要求
 
@@ -128,7 +128,7 @@ cp .env.example .env
 ```bash
 # 构建镜像
 docker build -t openclaw:latest ./bridge/
-docker build -t openclaw-sandbox:skillclaw ./sandbox/
+docker build -t openclaw-sandbox:agentclaw ./sandbox/
 
 # 启动服务
 docker compose up -d
@@ -206,7 +206,7 @@ timeout 30 python3 scripts/main.py
 
 ## 技术亮点
 
-SkillClaw 的 **frameClaw** 多租户架构实现：
+AgentClaw 的 **frameClaw** 多租户架构实现：
 
 - **共享实例** - 单 OpenClaw Gateway 服务多租户，资源高效利用
 - **动态沙盒** - 按需创建/销毁 Docker 容器执行环境

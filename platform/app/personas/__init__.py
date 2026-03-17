@@ -1,4 +1,4 @@
-"""Agent personas and templates for SkillClaw platform."""
+"""Agent personas and templates for AgentClaw platform."""
 
 import os
 from pathlib import Path
@@ -26,7 +26,7 @@ def load_persona(filename: str) -> str:
 
 
 def load_soul_md() -> str:
-    """Load the default SkillClaw SOUL.md template for regular users."""
+    """Load the default AgentClaw SOUL.md template for regular users."""
     return load_persona("SOUL.md")
 
 
@@ -37,4 +37,4 @@ def load_admin_persona() -> str:
 
 
 # Backward compatibility
-SKILLCLAW_SOUL_MD = load_soul_md()
+AGENTCLAW_SOUL_MD = load_soul_md()

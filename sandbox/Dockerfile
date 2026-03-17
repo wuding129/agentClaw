@@ -1,7 +1,7 @@
-# SkillClaw Sandbox Image - 国内优化版
+# AgentClaw Sandbox Image - 国内优化版
 # 基于 Node.js 官方镜像（已预装 Node.js 20），加装 Python 和常用工具
 #
-# 构建：docker build -t openclaw-sandbox:skillclaw ./sandbox/
+# 构建：docker build -t openclaw-sandbox:agentclaw ./sandbox/
 
 FROM node:20-bookworm-slim
 

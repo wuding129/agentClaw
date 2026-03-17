@@ -1,12 +1,12 @@
-# SkillClaw 配置目录
+# AgentClaw 配置目录
 
-这个目录存放 SkillClaw 平台的配置文件和智能体角色设定。
+这个目录存放 AgentClaw 平台的配置文件和智能体角色设定。
 
 ## 文件说明
 
 | 文件 | 用途 |
 |------|------|
-| `SOUL.md` | SkillClaw 平台的默认智能体角色设定（SOUL.md 格式） |
+| `SOUL.md` | AgentClaw 平台的默认智能体角色设定（SOUL.md 格式） |
 
 ## SOUL.md 格式
 
