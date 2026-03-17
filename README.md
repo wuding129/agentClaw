@@ -1,42 +1,44 @@
-# AgentClaw - 多租户 AI 技能创作平台，面向企业内部的的openclaw架构实践
+# AgentClaw - OpenClaw Multi-User Agent Platform (for Small Teams)
 
-这是我的一个架构实践项目，目的是为企业内部提供一个公共可用的skill生产平台，多租户管理，于是我基于openclaw作为agent核心框架设计了一套。全程指挥我的Claude完成，希望对大家有用。
+[中文版 README](README_CN.md)
 
-**AgentClaw** 是一个多租户 AI 技能开发平台。每个用户在独立的 Docker 沙盒中创作、测试、分享可复用的 AI 技能。
+Upgrade **OpenClaw's single-user agents** into a **multi-user agent platform** with a unified entry, user isolation, shared instances, dynamic sandboxes, and security governance. Built for small teams to spin up an internal agent platform quickly.
 
-采用 **frameClaw** 多租户架构 —— 基于 OpenClaw 实现共享实例 + 动态沙盒的租户隔离方案。
+**AgentClaw** provides multi-user agent runtime and governance. Each user runs their own agent sessions and workflows inside an isolated Docker sandbox.
 
-## 核心特性
+Powered by the **frameClaw** multi-tenant architecture — shared instances plus dynamic sandboxes for tenant isolation on top of OpenClaw.
 
-- **🎨 技能创作** - 在隔离沙盒中开发、测试、迭代 AI 技能
-- **🐳 严格沙盒隔离** - 每用户独立 Docker 容器，预装 Python/Node/工具链
-- **🌐 网络访问** - 支持 API 调用、包安装、网络爬取
-- **🔒 安全审核** - 自动化技能安全审查
-- **🚀 技能分享** - 平台精选技能库，支持安装到任意 Agent
-- **🔌 零侵入集成** - 不修改 OpenClaw 源码，通过 Bridge 层实现多租户
+## Key Features
 
-## 系统架构
+- **🧩 Multi-User Agent Platform** - Unified entry for small teams, user isolation, agent lifecycle management
+- **🐳 Strict Sandbox Isolation** - Per-user Docker containers with preinstalled Python/Node/toolchains
+- **🌐 Network Access** - API calls, package installs, web crawling supported
+- **🔒 Security Governance** - Automated security checks and least-privilege capabilities
+- **📦 Asset Reuse** - Skills/workflows/tools can be reused and shared across the platform
+- **🔌 Zero-Intrusion Integration** - No OpenClaw source modifications; multi-user via Bridge layer
 
-AgentClaw 采用 **frameClaw** 多租户架构：共享实例 + 动态沙盒：
+## Architecture
+
+AgentClaw uses the **frameClaw** multi-tenant architecture: shared instances + dynamic sandboxes:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        用户浏览器                                │
-│                   Frontend (React + Vite)                       │
+│                          User Browser                            │
+│                   Frontend (React + Vite)                        │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ HTTP / WebSocket
 ┌───────────────────────────▼─────────────────────────────────────┐
 │                    Platform Gateway                              │
 │                   FastAPI + PostgreSQL                           │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │  JWT 认证   │  │  LLM 代理   │  │  共享实例生命周期管理    │  │
+│  │  JWT Auth   │  │  LLM Proxy  │  │ Shared Instance Manager │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
 └───────────────────────────┬─────────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────────┐
 │                  OpenClaw Shared Instance                        │
 │  ┌─────────────────────────────────────────────────────────┐    │
-│  │  Bridge (HTTP API)  ◄──►  OpenClaw Gateway (Agent 引擎)  │    │
+│  │  Bridge (HTTP API)  ◄──►  OpenClaw Gateway (Agent Engine)│    │
 │  └─────────────────────────────────────────────────────────┘    │
 │                              │                                  │
 │         ┌────────────────────┼────────────────────┐             │
@@ -48,53 +50,53 @@ AgentClaw 采用 **frameClaw** 多租户架构：共享实例 + 动态沙盒：
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 零侵入集成
+### Zero-Intrusion Integration
 
-frameClaw **不修改 OpenClaw 源码**，通过 Bridge 适配层实现多租户能力：
+frameClaw **does not modify OpenClaw source**. Multi-tenancy is achieved through a Bridge adapter layer:
 
 ```
-OpenClaw (上游源码)
+OpenClaw (upstream)
     │
-    │ 原生 WebSocket / RPC
-    │
-    ▼
-Bridge (适配层) ───► HTTP API + 多租户路由
-    │
-    │ 配置注入
+    │ Native WebSocket / RPC
     │
     ▼
-Platform Gateway (认证/代理)
+Bridge (adapter) ───► HTTP API + multi-tenant routing
+    │
+    │ Config injection
+    │
+    ▼
+Platform Gateway (auth/proxy)
 ```
 
-**Bridge 层职责：**
-- 将 OpenClaw 的 WebSocket RPC 转换为 REST API
-- 注入多租户配置 (`X-Agent-Id` 路由)
-- 管理 per-agent workspace 目录
-- 转发 LLM 请求到 Platform Gateway
+**Bridge responsibilities:**
+- Convert OpenClaw WebSocket RPC to REST APIs
+- Inject multi-tenant config (`X-Agent-Id` routing)
+- Manage per-agent workspace directories
+- Forward LLM requests to the Platform Gateway
 
-这样 AgentClaw 可以跟随 OpenClaw 官方版本更新，无需维护 fork。
+This lets AgentClaw track upstream OpenClaw updates without maintaining a fork.
 
-### 多 Agent 设计
+### Multi-Agent Design
 
-OpenClaw 原生支持多 Agent，AgentClaw 利用此能力实现租户隔离：
+OpenClaw supports multiple agents natively. AgentClaw uses that to achieve tenant isolation:
 
-| 概念 | 说明 |
+| Concept | Description |
 |------|------|
-| Agent ID | 用户唯一标识（如 `08f95579-5ad0-48f6-a945-1233309a4fc0`）|
-| Workspace | 每个 Agent 独立目录 `~/.openclaw/workspace-{agentId}/`|
-| 沙盒 | 代码执行时动态创建 Docker 容器，执行后销毁 |
-| 会话 | `agent:{agentId}:{sessionKey}` 格式路由 |
+| Agent ID | Unique user identifier (e.g. `08f95579-5ad0-48f6-a945-1233309a4fc0`) |
+| Workspace | Per-agent directory `~/.openclaw/workspace-{agentId}/` |
+| Sandbox | Docker container created on demand; destroyed after execution |
+| Session | Routed as `agent:{agentId}:{sessionKey}` |
 
-### 沙盒配置
+### Sandbox Configuration
 
-默认沙盒镜像配置：
+Default sandbox image config:
 
 ```json
 {
   "sandbox": {
-    "mode": "all",           // 所有会话使用沙盒
-    "scope": "agent",        // 每 Agent 独立沙盒
-    "workspaceAccess": "rw", // 读写 workspace
+    "mode": "all",           // all sessions use sandbox
+    "scope": "agent",        // per-agent sandbox
+    "workspaceAccess": "rw", // read/write workspace
     "docker": {
       "image": "openclaw-sandbox:agentclaw",
       "readOnlyRoot": false,
@@ -109,111 +111,113 @@ OpenClaw 原生支持多 Agent，AgentClaw 利用此能力实现租户隔离：
 }
 ```
 
-## 快速开始（运行 AgentClaw 示例）
+## Quick Start (Run AgentClaw)
 
-### 环境要求
+Built for small teams: this repo provides a ready-to-run multi-user agent platform example.
+
+### Requirements
 
 - Docker & Docker Compose
-- 至少一个 LLM API Key (Anthropic/OpenAI/DashScope 等)
+- At least one LLM API key (Anthropic/OpenAI/DashScope, etc.)
 
-### 配置
+### Setup
 
 ```bash
 cp .env.example .env
-# 编辑 .env，添加 LLM API Keys
+# edit .env and add LLM API keys
 ```
 
-### 启动
+### Run
 
 ```bash
-# 构建镜像
+# build images
 docker build -t openclaw:latest ./bridge/
 docker build -t openclaw-sandbox:agentclaw ./sandbox/
 
-# 启动服务
+# start services
 docker compose up -d
 ```
 
-访问 http://127.0.0.1:3080
+Visit http://127.0.0.1:3080
 
-## 技能工作流
+## Platform Usage (Skills Are Only One Part)
 
-### 1. 创建技能
+### 1. Create a Skill (Reusable Asset)
 
 ```
 skills/
 └── my-skill/
-    ├── SKILL.md          # 技能描述、触发条件、使用说明
+    ├── SKILL.md          # description, triggers, usage
     ├── scripts/
-    │   └── main.py       # 可执行脚本
-    └── references/       # 参考资料
+    │   └── main.py       # executable script
+    └── references/       # references
 ```
 
-### 2. 沙盒测试
+### 2. Sandbox Testing (Unified Runtime)
 
-Agent 在沙盒中实际运行脚本：
+Agent executes scripts inside the sandbox:
 
 ```bash
-# 安装依赖
+# install deps
 apt-get update && apt-get install -y some-package
 pip install requests
 
-# 执行测试
+# run test
 timeout 30 python3 scripts/main.py
 ```
 
-### 3. 安全审核
+### 3. Security Review (Platform Governance)
 
-创建/修改技能后自动触发安全检查，确保无恶意代码。
+Creating/updating a skill triggers automated security checks.
 
-### 4. 分享安装
+### 4. Share & Install (Asset Distribution)
 
-- 提交到平台精选技能库
-- 其他用户可一键安装到任意 Agent
+- Submit to the curated skill library
+- Other users can install into any agent with one click
 
-## 项目结构
+## Project Structure
 
 ```
 .
-├── bridge/              # Bridge 适配层 - frameClaw 核心 (Node.js)
-│   ├── config.ts        # OpenClaw 多租户配置生成
-│   ├── server.ts        # HTTP API + WebSocket 中继
-│   └── routes/          # Agents、Skills、Files API
+├── bridge/              # Bridge adapter - frameClaw core (Node.js)
+│   ├── config.ts        # OpenClaw multi-tenant config generation
+│   ├── server.ts        # HTTP API + WebSocket relay
+│   └── routes/          # Agents, Skills, Files APIs
 │
-├── platform/            # 平台网关 (Python FastAPI)
-│   ├── auth.py          # JWT 认证 + Agent 生命周期管理
-│   ├── proxy.py         # 请求路由到共享实例
-│   └── shared_manager.py # 共享 OpenClaw 实例管理
+├── platform/            # Platform gateway (Python FastAPI)
+│   ├── auth.py          # JWT auth + agent lifecycle
+│   ├── proxy.py         # Route requests to shared instance
+│   └── shared_manager.py # Shared OpenClaw instance manager
 │
-├── frontend/            # Web 前端 (React + Vite)
-│   └── pages/           # Chat、Agents、Skills、FileManager
+├── frontend/            # Web frontend (React + Vite)
+│   └── pages/           # Chat, Agents, Skills, FileManager
 │
-├── sandbox/             # 沙盒镜像 Dockerfile
-│   └── Dockerfile       # 多租户 Agent 执行环境
+├── sandbox/             # Sandbox image Dockerfile
+│   └── Dockerfile       # Multi-user agent execution environment
 │
-└── docker-compose.yml   # 多服务编排
+└── docker-compose.yml   # Multi-service composition
 ```
 
-## 安全设计
+## Security Design
 
-| 层面 | 措施 |
+| Layer | Measure |
 |------|------|
-| API Key 隔离 | 所有 LLM API Key 仅存在于 Gateway 环境变量 |
-| 沙盒执行 | 代码在 Docker 容器运行，资源受限，无法逃逸 |
-| 文件隔离 | 每用户独立 workspace，跨用户不可访问 |
-| 网络隔离 | 沙盒允许出站，禁止入站 |
-| 能力限制 | `capDrop: ALL`，只读 root 可选 |
+| API Key Isolation | All LLM API keys live only in Gateway env vars |
+| Sandbox Execution | Code runs in Docker with resource limits, no escape |
+| File Isolation | Per-user workspace; cross-user access blocked |
+| Network Isolation | Outbound allowed; inbound blocked |
+| Capability Limits | `capDrop: ALL`, optional read-only root |
 
-## 技术亮点
+## Highlights
 
-AgentClaw 的 **frameClaw** 多租户架构实现：
+AgentClaw's **frameClaw** multi-tenant architecture enables:
 
-- **共享实例** - 单 OpenClaw Gateway 服务多租户，资源高效利用
-- **动态沙盒** - 按需创建/销毁 Docker 容器执行环境
-- **零侵入集成** - 不修改 OpenClaw 源码，通过 Bridge 适配层实现多租户
-- **安全隔离** - JWT 认证、API Key 代理、文件系统隔离
+- **Shared Instance** - Single OpenClaw Gateway serving multiple users efficiently
+- **Dynamic Sandbox** - On-demand Docker environments
+- **Zero-Intrusion Integration** - No OpenClaw source changes; Bridge adapter only
+- **Security Isolation** - JWT auth, API key proxying, filesystem isolation
 
-这套架构设计可适配其他 Agent 引擎，未来可用于构建企业内部 Agent 平台等场景。
+This architecture can be adapted to other agent engines for internal agent platforms or multi-tenant AI platforms.
 
 ## License
 
