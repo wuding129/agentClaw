@@ -1,10 +1,13 @@
 import { Bell, Settings, LogOut, Check } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
-import { ping, logout, getUnreadCount, listNotifications, markNotificationsAsRead, markAllNotificationsAsRead, type Notification } from '../lib/api'
+import { ping, logout, getMe, getUnreadCount, listNotifications, markNotificationsAsRead, markAllNotificationsAsRead, type Notification } from '../lib/api'
 import { ThemeToggle } from './ThemeToggle'
+import { useNavigate } from 'react-router-dom'
 
 export default function TopBar() {
+  const navigate = useNavigate()
   const [online, setOnline] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -16,6 +19,10 @@ export default function TopBar() {
     check()
     const interval = setInterval(check, 30000)
     return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    getMe().then(u => setIsAdmin(u.role === 'admin')).catch(() => {})
   }, [])
 
   // Poll for unread count
@@ -156,9 +163,15 @@ export default function TopBar() {
           )}
         </div>
 
-        <button className="flex items-center justify-center p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-surface transition-colors">
-          <Settings size={20} />
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => navigate('/settings')}
+            className="flex items-center justify-center p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-surface transition-colors"
+            title="系统设置"
+          >
+            <Settings size={20} />
+          </button>
+        )}
         <button
           onClick={() => logout()}
           className="flex items-center justify-center p-2 rounded-lg text-text-secondary hover:text-accent-red hover:bg-bg-surface transition-colors"

@@ -13,7 +13,6 @@ import {
   Paperclip,
   X,
   FileText,
-  Wrench,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -85,12 +84,6 @@ export default function Chat() {
   // Files
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  // Tool call status
-  const [toolStatuses, setToolStatuses] = useState<{ name: string; done: boolean }[]>([])
-
-  // Agent filter
-  const [filterAgentId, setFilterAgentId] = useState<string>('')
 
   // New session
   const [showNewSession, setShowNewSession] = useState(false)
@@ -328,7 +321,6 @@ export default function Chat() {
       setError(err?.message || '发送失败')
     } finally {
       setSending(false)
-      setToolStatuses([])
     }
   }
 
@@ -388,20 +380,6 @@ export default function Chat() {
           return
         }
 
-        // Tool use events
-        if (msg.type === 'event' && msg.payload) {
-          if (msg.event === 'tool.use.start') {
-            const toolName = msg.payload.tool || msg.payload.name || 'tool'
-            setToolStatuses(prev => [...prev.filter(t => t.name !== toolName), { name: toolName, done: false }])
-          } else if (msg.event === 'tool.use.end') {
-            const toolName = msg.payload.tool || msg.payload.name || 'tool'
-            setToolStatuses(prev => prev.map(t => t.name === toolName ? { ...t, done: true } : t))
-            setTimeout(() => {
-              setToolStatuses(prev => prev.filter(t => !(t.name === toolName && t.done)))
-            }, 2000)
-          }
-        }
-
         // Chat event — agent turn completion signal
         // Agent may have multiple turns (tool call → response → tool call → response),
         // each producing a "final" event. Use debounce: refresh messages on every "final",
@@ -420,7 +398,6 @@ export default function Chat() {
                 // Refresh messages immediately (show latest replies in real-time)
                 getSession(currentKey).then(detail => {
                   setMessages(detail.messages || [])
-                  setToolStatuses([])
                 }).catch(() => {})
 
                 // Debounce: reset the completion timer on every "final"
@@ -586,32 +563,6 @@ export default function Chat() {
           </button>
         </div>
 
-        {/* Agent filter pills (only shown when >1 agent) */}
-        {agents.length > 1 && (
-          <div className="px-3 py-2 border-b border-border-default flex gap-1 flex-wrap">
-            <button
-              onClick={() => setFilterAgentId('')}
-              className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors ${
-                !filterAgentId ? 'bg-accent-blue text-white' : 'text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              全部
-            </button>
-            {agents.map(a => (
-              <button
-                key={a.id}
-                onClick={() => setFilterAgentId(a.id)}
-                className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors truncate max-w-[100px] ${
-                  filterAgentId === a.id ? 'bg-accent-blue text-white' : 'text-text-secondary hover:text-text-primary'
-                }`}
-                title={a.displayName || a.identity?.name || a.name || a.id}
-              >
-                {a.displayName || a.identity?.name || a.name || a.id.slice(0, 8)}
-              </button>
-            ))}
-          </div>
-        )}
-
         <div className="flex-1 overflow-y-auto">
           {sessionsLoading ? (
             <div className="flex items-center justify-center py-8">
@@ -623,7 +574,7 @@ export default function Chat() {
             </div>
           ) : (
             <div className="py-1">
-              {sessions.filter(s => !filterAgentId || getAgentIdFromKey(s.key) === filterAgentId).map(s => (
+              {sessions.map(s => (
                 <button
                   key={s.key}
                   onClick={() => loadSession(s.key)}
@@ -710,7 +661,7 @@ export default function Chat() {
                         {msg.role === 'user' ? (
                           <div className="text-sm whitespace-pre-wrap break-words">{msg.content}</div>
                         ) : (
-                          <div className="text-sm prose prose-sm max-w-none dark:prose-invert text-text-primary [&_pre]:bg-bg-code [&_pre]:rounded [&_pre]:p-2 [&_pre]:overflow-x-auto [&_code]:text-accent-blue [&_code]:bg-bg-code [&_code]:rounded [&_code]:px-1 [&_a]:text-accent-blue [&_ul]:list-disc [&_ol]:list-decimal [&_li]:ml-4">
+                          <div className="text-sm prose prose-sm max-w-none dark:prose-invert text-text-primary [&_pre]:bg-bg-base [&_pre]:rounded [&_pre]:p-2 [&_pre]:overflow-x-auto [&_code]:text-accent-blue [&_code]:bg-bg-base [&_code]:rounded [&_code]:px-1 [&_a]:text-accent-blue [&_ul]:list-disc [&_ol]:list-decimal [&_li]:ml-4">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                           </div>
                         )}
@@ -729,24 +680,7 @@ export default function Chat() {
                       )}
                     </div>
                   ))}
-                  {/* Tool call status rows */}
-                  {toolStatuses.map((t, i) => (
-                    <div key={`tool-${i}`} className="flex gap-3">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-yellow/10 mt-0.5">
-                        <Wrench size={14} className="text-accent-yellow" />
-                      </div>
-                      <div className="rounded-xl bg-bg-surface border border-border-default px-4 py-2 text-xs text-text-secondary flex items-center gap-2">
-                        {t.done ? (
-                          <span className="text-accent-green">✓</span>
-                        ) : (
-                          <Loader2 size={10} className="animate-spin text-accent-yellow" />
-                        )}
-                        <span>{t.done ? `已完成: ${t.name}` : `正在调用: ${t.name}...`}</span>
-                      </div>
-                    </div>
-                  ))}
-
-                  {sending && toolStatuses.length === 0 && (
+                  {sending && (
                     <div className="flex gap-3">
                       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-blue/10 text-accent-blue mt-0.5">
                         <Bot size={14} />

@@ -45,7 +45,7 @@ export default function Layout() {
         <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(v => !v)} />
         <div className="flex flex-1 flex-col overflow-hidden">
           <TopBar />
-          <main className="flex-1 overflow-y-auto p-6">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden p-6">
             <Outlet />
           </main>
         </div>

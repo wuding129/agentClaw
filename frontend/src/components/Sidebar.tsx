@@ -17,7 +17,6 @@ import {
   User,
   Users,
   PanelLeftClose,
-  PanelLeftOpen,
 } from 'lucide-react'
 
 interface Props {
@@ -94,25 +93,32 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
     >
       {/* Logo + toggle */}
       <div className="flex items-center border-b border-border-default px-3 py-4 gap-2">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-blue text-xs font-bold text-white">
-          AC
-        </div>
-        <div style={labelStyle}>
-          <div className="text-sm font-semibold text-text-primary">AgentClaw</div>
-          <div className="text-xs text-text-secondary">多租户 Agent 平台</div>
-        </div>
-        <button
-          onClick={onToggle}
-          style={{ marginLeft: 'auto' }}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-secondary hover:bg-bg-surface hover:text-text-primary transition-colors"
-          title={collapsed ? '展开菜单' : '收起菜单'}
+        <div
+          onClick={collapsed ? onToggle : undefined}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${collapsed ? 'cursor-pointer hover:ring-2 hover:ring-accent-blue/40' : ''}`}
+          title={collapsed ? '展开菜单' : undefined}
         >
-          {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
-        </button>
+          <img src="/logo.png" alt="AgentClaw" className="h-8 w-8 scale-150 object-contain" />
+        </div>
+        {!collapsed && (
+          <>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-text-primary truncate">AgentClaw</div>
+              <div className="text-xs text-text-secondary truncate">多租户 Agent 平台</div>
+            </div>
+            <button
+              onClick={onToggle}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-secondary hover:bg-bg-surface hover:text-text-primary transition-colors"
+              title="收起菜单"
+            >
+              <PanelLeftClose size={15} />
+            </button>
+          </>
+        )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-2 py-2">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2">
         {navSections.map(section => (
           <div key={section.label} className="mb-3">
             <div style={{

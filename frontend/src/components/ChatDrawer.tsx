@@ -291,7 +291,7 @@ export default function ChatDrawer({ agentId, agentName, agentEmoji, sessionKey:
                 {msg.role === 'user' ? (
                   <div className="whitespace-pre-wrap break-words">{msg.content}</div>
                 ) : (
-                  <div className="prose prose-sm max-w-none dark:prose-invert text-text-primary [&_pre]:bg-bg-code [&_pre]:rounded [&_pre]:p-2 [&_code]:text-accent-blue [&_code]:bg-bg-code [&_code]:rounded [&_code]:px-1 [&_a]:text-accent-blue">
+                  <div className="prose prose-sm max-w-none dark:prose-invert text-text-primary [&_pre]:bg-bg-base [&_pre]:rounded [&_pre]:p-2 [&_code]:text-accent-blue [&_code]:bg-bg-base [&_code]:rounded [&_code]:px-1 [&_a]:text-accent-blue">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {msg.content}
                     </ReactMarkdown>
