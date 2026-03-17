@@ -7,7 +7,7 @@ import {
 import type { Skill, SkillSearchResult, CuratedSkill, SkillSubmission, PlatformSkill } from '../lib/api'
 import {
   Zap, Loader2, Search, Download, ExternalLink, Check,
-  AlertTriangle, Star, Send, Copy, Package,
+  AlertTriangle, Star, Send, Package,
 } from 'lucide-react'
 
 type Tab = 'curated' | 'search' | 'installed' | 'platform'
@@ -27,7 +27,8 @@ export default function SkillStore() {
   // Platform skills (global skills from project skills/ directory)
   const [platformSkills, setPlatformSkills] = useState<PlatformSkill[]>([])
   const [loadingPlatform, setLoadingPlatform] = useState(true)
-  const [copyingSkill, setCopyingSkill] = useState<string | null>(null)
+  const [installingPlatform, setInstallingPlatform] = useState<string | null>(null)
+  const [platformToast, setPlatformToast] = useState<{ text: string; ok: boolean } | null>(null)
 
   // Search state
   const [query, setQuery] = useState('')
@@ -145,18 +146,19 @@ export default function SkillStore() {
     }
   }
 
-  const handleCopySkill = async (skillName: string) => {
-    if (copyingSkill) return
-    setCopyingSkill(skillName)
-    setInstallError('')
+  const handleInstallPlatform = async (skillName: string) => {
+    if (installingPlatform) return
+    setInstallingPlatform(skillName)
+    setPlatformToast(null)
     try {
       await copySkillToWorkspace(skillName)
       refreshSkills()
-      setTab('installed')
+      setPlatformToast({ text: `「${skillName}」安装成功`, ok: true })
     } catch (err: any) {
-      setInstallError(err?.message || '复制失败')
+      setPlatformToast({ text: err?.message || '安装失败', ok: false })
     } finally {
-      setCopyingSkill(null)
+      setInstallingPlatform(null)
+      setTimeout(() => setPlatformToast(null), 3000)
     }
   }
 
@@ -463,12 +465,16 @@ export default function SkillStore() {
       {/* ===== Platform Tab ===== */}
       {tab === 'platform' && (
         <div>
-          <div className="mb-4 rounded-lg border border-accent-blue/20 bg-accent-blue/5 px-4 py-3">
-            <p className="text-sm text-text-primary">
-              <Package size={14} className="inline mr-1.5 text-accent-blue" />
-              平台技能是系统内置的技能，可直接复制到你的 workspace 进行自定义修改。
-            </p>
-          </div>
+          {platformToast && (
+            <div className={`mb-4 rounded-lg px-4 py-3 text-sm ${
+              platformToast.ok
+                ? 'bg-accent-green/10 text-accent-green'
+                : 'bg-accent-red/10 text-accent-red'
+            }`}>
+              {platformToast.ok ? <Check size={14} className="inline mr-1.5" /> : null}
+              {platformToast.text}
+            </div>
+          )}
           {loadingPlatform ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 size={24} className="animate-spin text-accent-blue" />
@@ -480,7 +486,7 @@ export default function SkillStore() {
           ) : (
             <div className="grid grid-cols-3 gap-4">
               {platformSkills.map(skill => {
-                const isCopying = copyingSkill === skill.name
+                const isInstalling = installingPlatform === skill.name
                 const isInstalled = skills.some(s => s.name === skill.name && s.source === 'workspace')
                 return (
                   <div
@@ -496,18 +502,21 @@ export default function SkillStore() {
                     <h3 className="mt-3 text-sm font-semibold text-text-primary">{skill.name}</h3>
                     <p className="mt-1 text-xs text-text-secondary leading-relaxed line-clamp-2">{skill.description}</p>
                     <button
-                      onClick={() => handleCopySkill(skill.name)}
-                      disabled={isCopying || isInstalled}
-                      className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent-blue px-3 py-2 text-sm font-medium text-white hover:bg-accent-blue/90 disabled:opacity-50 transition-colors"
+                      onClick={() => handleInstallPlatform(skill.name)}
+                      disabled={isInstalling || isInstalled}
+                      className={`mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium transition-colors ${
+                        isInstalled
+                          ? 'bg-accent-green/10 text-accent-green'
+                          : 'bg-accent-blue/10 text-accent-blue hover:bg-accent-blue/20 disabled:opacity-50'
+                      }`}
                     >
-                      {isCopying ? (
-                        <Loader2 size={14} className="animate-spin" />
+                      {isInstalling ? (
+                        <><Loader2 size={13} className="animate-spin" /> 安装中...</>
                       ) : isInstalled ? (
-                        <Check size={14} />
+                        <><Check size={13} /> 已安装</>
                       ) : (
-                        <Copy size={14} />
+                        <><Download size={13} /> 安装</>
                       )}
-                      {isCopying ? '复制中...' : isInstalled ? '已复制' : '复制到 Workspace'}
                     </button>
                   </div>
                 )
