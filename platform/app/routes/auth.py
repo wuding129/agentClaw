@@ -23,7 +23,7 @@ from app.config import settings
 from app.container.shared_manager import ensure_shared_container
 from app.db.engine import get_db
 from app.db.models import User, UserAgent
-from app.personas import load_soul_md
+from app.personas import load_agents_md, load_soul_md
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -75,7 +75,7 @@ async def _create_default_agent_for_user(
                 print(f"[auth] Failed to create agent in OpenClaw for {user_id}: {resp.status_code} - {resp.text}")
                 return None
 
-            # For regular users, set the AgentClaw SOUL.md
+            # For regular users, set SOUL.md and optionally AGENTS.md
             if not is_admin:
                 soul_resp = await client.put(
                     f"{bridge_url}/api/agents/{openclaw_agent_id}/files/SOUL.md",
@@ -84,6 +84,16 @@ async def _create_default_agent_for_user(
                 )
                 if soul_resp.status_code != 200:
                     print(f"[auth] Warning: Failed to set SOUL.md for agent {openclaw_agent_id}")
+
+                agents_md = load_agents_md()
+                if agents_md is not None:
+                    agents_resp = await client.put(
+                        f"{bridge_url}/api/agents/{openclaw_agent_id}/files/AGENTS.md",
+                        json={"content": agents_md},
+                        headers={"X-Agent-Id": openclaw_agent_id, "X-Is-Admin": "true"},
+                    )
+                    if agents_resp.status_code != 200:
+                        print(f"[auth] Warning: Failed to set AGENTS.md for agent {openclaw_agent_id}")
     except Exception as e:
         print(f"[auth] Failed to create agent in OpenClaw for user {user_id}: {e}")
         return None

@@ -30,9 +30,20 @@ def load_soul_md() -> str:
     return load_persona("SOUL.md")
 
 
+def load_agents_md() -> str | None:
+    """Load the default AGENTS.md template if configured.
+
+    Returns None if AGENTS.md is not present in config dir,
+    in which case the OpenClaw default will remain untouched.
+    """
+    filepath = _CONFIG_DIR / "AGENTS.md"
+    if not filepath.exists():
+        return None
+    return filepath.read_text(encoding="utf-8")
+
+
 def load_admin_persona() -> str:
     """Load the admin persona (uses default OpenClaw behavior)."""
-    # Admin users don't get a custom SOUL.md, they use OpenClaw default
     return ""
 
 

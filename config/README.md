@@ -4,9 +4,10 @@
 
 ## 文件说明
 
-| 文件 | 用途 |
-|------|------|
-| `SOUL.md` | AgentClaw 平台的默认智能体角色设定（SOUL.md 格式） |
+| 文件 | 用途 | 是否必须 |
+|------|------|---------|
+| `SOUL.md` | Agent 身份与人格（每次对话都读取） | 必须 |
+| `AGENTS.md` | Agent 行为规范（记忆系统、工作方式、红线规则） | 可选，不存在则使用 OpenClaw 默认 |
 
 ## SOUL.md 格式
 
@@ -28,20 +29,28 @@ summary: 简短描述
 - `summary` - 简短摘要，用于上下文管理
 - 正文 - 角色的详细设定、行为规则、工作流等
 
-## 修改角色设定
+## 修改配置
 
-直接编辑 `SOUL.md` 文件，修改后重启服务生效：
+直接编辑对应文件，修改后重启服务生效：
 
 ```bash
-docker compose restart gateway openclaw-shared
+docker compose restart gateway
 ```
 
-现有用户的 SOUL.md 不会自动更新，需要手动同步或重新创建用户。
+**注意：** 现有用户的 Agent 文件不会自动更新，仅对新注册用户生效。
 
-## 添加新角色（高级）
+如需同步到现有 Agent，可手动调用 bridge API 或重新创建用户。
 
-如需为不同用户类型配置不同角色：
+## 部署定制（白标化）
 
-1. 在此目录创建新的 `.md` 文件
-2. 修改 `platform/app/personas/__init__.py` 添加加载函数
-3. 在相关代码中引用新角色
+不同的产品实例替换这两个文件即可定制 Agent 形态：
+
+```
+config/
+  SOUL.md     # 定义 Agent 是谁（品牌、人格、工作流）
+  AGENTS.md   # 定义 Agent 怎么工作（可选覆盖 OpenClaw 默认）
+```
+
+例如 SkillClaw 部署：
+- `SOUL.md` → "你是 SkillClaw，技能创作助手"
+- `AGENTS.md` → 精简版，去掉群聊规则，强调技能开发工作流
