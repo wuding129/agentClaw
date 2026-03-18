@@ -169,6 +169,7 @@ docker compose up -d
 - `prepare.py` 用于启动前环境检查与提示。
 - 用户文件持久化在宿主机（如 `~/.openclaw` 与 Docker 卷），删除这些数据会导致用户数据丢失。
 - 默认 OpenClaw 版本为 **2026.3.8**（构建参数 `OPENCLAW_VERSION`）。如需升级/降级，在 `.env` 设置 `OPENCLAW_VERSION` 后执行 `docker compose up -d --build`。
+- **首个注册用户默认成为管理员**。
 
 ## 平台使用（技能只是其中一部分）
 

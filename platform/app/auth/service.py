@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 from jose import JWTError, jwt
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -74,10 +74,14 @@ async def get_user_by_id(db: AsyncSession, user_id: str) -> User | None:
 
 
 async def create_user(db: AsyncSession, username: str, email: str, password: str) -> User:
+    # First registered user becomes admin by default
+    result = await db.execute(select(func.count()).select_from(User))
+    user_count = result.scalar_one() or 0
     user = User(
         username=username,
         email=email,
         password_hash=hash_password(password),
+        role="admin" if user_count == 0 else "user",
     )
     db.add(user)
     await db.commit()

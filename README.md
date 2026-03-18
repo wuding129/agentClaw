@@ -169,6 +169,7 @@ Visit http://127.0.0.1:3080
 - `prepare.py` helps validate Docker and `.env` before starting.
 - User files are persisted on the host (for example `~/.openclaw` and Docker volumes). Removing those will delete data.
 - Default OpenClaw version is **2026.3.8** (build arg `OPENCLAW_VERSION`). To change it, set `OPENCLAW_VERSION` in `.env` and rerun `docker compose up -d --build`.
+- The **first registered user becomes admin** by default.
 
 ## Platform Usage (Skills Are Only One Part)
 
