@@ -10,10 +10,14 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone, timedelta
 
+import litellm
 from fastapi import HTTPException, status
 from litellm import acompletion
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+# Drop unsupported params (e.g., gpt-5 doesn't support temperature=0.7)
+litellm.drop_params = True
 
 from app.auth.service import decode_token
 from app.config import settings
