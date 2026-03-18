@@ -1,8 +1,10 @@
-import { Bell, Settings, LogOut, Check } from 'lucide-react'
+import { Bell, Settings, LogOut, Check, Github } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { ping, logout, getMe, getUnreadCount, listNotifications, markNotificationsAsRead, markAllNotificationsAsRead, type Notification } from '../lib/api'
 import { ThemeToggle } from './ThemeToggle'
 import { useNavigate } from 'react-router-dom'
+
+const GITHUB_REPO = 'https://github.com/wuding129/agentClaw'
 
 export default function TopBar() {
   const navigate = useNavigate()
@@ -103,6 +105,17 @@ export default function TopBar() {
 
         {/* Theme Toggle */}
         <ThemeToggle variant="simple" />
+
+        {/* GitHub Star */}
+        <a
+          href={GITHUB_REPO}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-surface transition-colors"
+          title="在 GitHub 上给我们 Star"
+        >
+          <Github size={20} />
+        </a>
 
         {/* Notifications */}
         <div className="relative flex items-center" ref={dropdownRef}>
