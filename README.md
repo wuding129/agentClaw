@@ -4,7 +4,8 @@
 
 [中文版 README](README_CN.md)
 
-Inspired by open-source projects (for example, MultiUserClaw for multi-OpenClaw instances), I put this together after plenty of tinkering. If you find it useful, a star would mean a lot.
+Inspired by open-source projects and built on the shoulders of giants, I put this together after plenty of tinkering. Some code is derived from the open-source community, now shared back. If you find it useful, a star would mean a lot.
+Issues and feedback are welcome.
 
 Upgrade **OpenClaw's single-user agents** into a **multi-tenant agent platform** with a unified entry, user isolation, shared instances, dynamic sandboxes, and security governance. Built for small teams to spin up an internal agent platform quickly.
 
@@ -54,6 +55,20 @@ AgentClaw uses a multi-tenant architecture on top of OpenClaw: shared OpenClaw i
 │    └─────────┘         └─────────┘         └─────────┘        │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+## Screenshots
+
+![Screenshot 1](docs/assets/ScreenShot_2026-03-18_130908_672.png)
+![Screenshot 2](docs/assets/ScreenShot_2026-03-18_130949_774.png)
+![Screenshot 3](docs/assets/ScreenShot_2026-03-18_131005_077.png)
+![Screenshot 4](docs/assets/ScreenShot_2026-03-18_131015_934.png)
+![Screenshot 5](docs/assets/ScreenShot_2026-03-18_131032_353.png)
+![Screenshot 6](docs/assets/ScreenShot_2026-03-18_132407_028.png)
+![Screenshot 7](docs/assets/ScreenShot_2026-03-18_132534_637.png)
+![Screenshot 8](docs/assets/ScreenShot_2026-03-18_133426_647.png)
+![Screenshot 9](docs/assets/ScreenShot_2026-03-18_133618_386.png)
+![Screenshot 10](docs/assets/ScreenShot_2026-03-18_133809_104.png)
+![Screenshot 11](docs/assets/ScreenShot_2026-03-18_133833_735.png)
 
 ### Zero-Intrusion Integration
 
@@ -247,6 +262,6 @@ MIT
 ## Acknowledgements
 
 This project is inspired by and derived from:
-- OpenClaw - Copyright (c) OpenDILab
-- nanobot - Copyright (c) HKUDS
-- MultiUserClaw - Copyright (c) johnson7788
+- [OpenClaw](https://github.com/opendilab/openclaw) - Copyright (c) OpenDILab
+- [nanobot](https://github.com/HKUDS/nanobot) - Copyright (c) HKUDS
+- [MultiUserClaw](https://github.com/johnson7788/MultiUserClaw) - Copyright (c) johnson7788

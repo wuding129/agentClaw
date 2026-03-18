@@ -4,7 +4,8 @@
 
 [English README](README.md)
 
-通过各种开源项目比如多openclaw实例MultiUserClaw的启发与学习，各种vibe后攒了一个这个，希望对大家有启发或帮助，如果您觉得有价值帮忙点点star⭐️。
+通过各种开源项目的启发与学习，站在巨人肩膀上各种魔改vibe后攒了一个这个，部分代码来源于开源社区，现在反馈回来，希望对大家有启发或帮助，如果您觉得有价值帮忙点点star⭐️。
+欢迎提 issue 反馈问题。
 
 把 **OpenClaw 的单用户 Agents** 改造为 **多租户可用的 Agent 平台**，提供统一入口、用户隔离、共享实例、动态沙盒与安全治理能力，适合小团队快速搭建内部 Agent 平台。
 
@@ -54,6 +55,20 @@ AgentClaw 基于openclaw为基础采用多租户架构：共享openclaw实例 + 
 │    └─────────┘         └─────────┘         └─────────┘        │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+## 系统演示
+
+![演示截图 1](docs/assets/ScreenShot_2026-03-18_130908_672.png)
+![演示截图 2](docs/assets/ScreenShot_2026-03-18_130949_774.png)
+![演示截图 3](docs/assets/ScreenShot_2026-03-18_131005_077.png)
+![演示截图 4](docs/assets/ScreenShot_2026-03-18_131015_934.png)
+![演示截图 5](docs/assets/ScreenShot_2026-03-18_131032_353.png)
+![演示截图 6](docs/assets/ScreenShot_2026-03-18_132407_028.png)
+![演示截图 7](docs/assets/ScreenShot_2026-03-18_132534_637.png)
+![演示截图 8](docs/assets/ScreenShot_2026-03-18_133426_647.png)
+![演示截图 9](docs/assets/ScreenShot_2026-03-18_133618_386.png)
+![演示截图 10](docs/assets/ScreenShot_2026-03-18_133809_104.png)
+![演示截图 11](docs/assets/ScreenShot_2026-03-18_133833_735.png)
 
 ### 零侵入集成
 
@@ -248,7 +263,7 @@ MIT
 
 ## 致谢
 
-本项目灵感与来源：
-- OpenClaw - Copyright (c) OpenDILab
-- nanobot - Copyright (c) HKUDS
-- MultiUserClaw - Copyright (c) johnson7788
+本项目灵感与部分代码来源：
+- [OpenClaw](https://github.com/opendilab/openclaw) - Copyright (c) OpenDILab MIT
+- [nanobot](https://github.com/HKUDS/nanobot) - Copyright (c) HKUDS MIT
+- [MultiUserClaw](https://github.com/johnson7788/MultiUserClaw) - Copyright (c) johnson7788 MIT
