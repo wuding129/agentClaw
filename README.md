@@ -4,11 +4,13 @@
 
 [中文版 README](README_CN.md)
 
-Upgrade **OpenClaw's single-user agents** into a **multi-user agent platform** with a unified entry, user isolation, shared instances, dynamic sandboxes, and security governance. Built for small teams to spin up an internal agent platform quickly.
+Inspired by open-source projects (for example, MultiUserClaw for multi-OpenClaw instances), I put this together after plenty of tinkering. If you find it useful, a star would mean a lot.
+
+Upgrade **OpenClaw's single-user agents** into a **multi-tenant agent platform** with a unified entry, user isolation, shared instances, dynamic sandboxes, and security governance. Built for small teams to spin up an internal agent platform quickly.
 
 **AgentClaw** provides multi-user agent runtime and governance. Each user runs their own agent sessions and workflows inside an isolated Docker sandbox.
 
-Powered by the **frameClaw** multi-tenant architecture — shared instances plus dynamic sandboxes for tenant isolation on top of OpenClaw.
+Built on OpenClaw with a multi-tenant architecture — shared OpenClaw instances plus dynamic agent sandboxes for tenant isolation.
 
 ## Key Features
 
@@ -17,11 +19,12 @@ Powered by the **frameClaw** multi-tenant architecture — shared instances plus
 - **🌐 Network Access** - API calls, package installs, web crawling supported
 - **🔒 Security Governance** - Automated security checks and least-privilege capabilities
 - **📦 Asset Reuse** - Skills/workflows/tools can be reused and shared across the platform
+- **🧩 Composable Agents** - Customize agents for yourself or your team, and freely combine reusable skill packs
 - **🔌 Zero-Intrusion Integration** - No OpenClaw source modifications; multi-user via Bridge layer
 
 ## Architecture
 
-AgentClaw uses the **frameClaw** multi-tenant architecture: shared instances + dynamic sandboxes:
+AgentClaw uses a multi-tenant architecture on top of OpenClaw: shared OpenClaw instances + dynamic agent sandboxes:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -54,7 +57,7 @@ AgentClaw uses the **frameClaw** multi-tenant architecture: shared instances + d
 
 ### Zero-Intrusion Integration
 
-frameClaw **does not modify OpenClaw source**. Multi-tenancy is achieved through a Bridge adapter layer:
+AgentClaw **does not modify OpenClaw source**. Multi-tenancy is achieved through a Bridge adapter layer:
 
 ```
 OpenClaw (upstream)
@@ -191,7 +194,7 @@ Creating/updating a skill triggers automated security checks.
 
 ```
 .
-├── bridge/              # Bridge adapter - frameClaw core (Node.js)
+├── bridge/              # Bridge adapter
 │   ├── config.ts        # OpenClaw multi-tenant config generation
 │   ├── server.ts        # HTTP API + WebSocket relay
 │   └── routes/          # Agents, Skills, Files APIs

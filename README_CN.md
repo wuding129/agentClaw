@@ -4,8 +4,9 @@
 
 [English README](README.md)
 
-通过各种开源项目的启发与学习，各种vibe后攒了一个这个，希望对大家有用。
-把 **OpenClaw 的单用户 Agents** 升级为 **多用户可用的 Agent 平台**，提供统一入口、用户隔离、共享实例、动态沙盒与安全治理能力，适合小团队快速搭建内部 Agent 平台。
+通过各种开源项目比如多openclaw实例MultiUserClaw的启发与学习，各种vibe后攒了一个这个，希望对大家有启发或帮助，如果您觉得有价值帮忙点点star⭐️。
+
+把 **OpenClaw 的单用户 Agents** 改造为 **多租户可用的 Agent 平台**，提供统一入口、用户隔离、共享实例、动态沙盒与安全治理能力，适合小团队快速搭建内部 Agent 平台。
 
 **AgentClaw** 提供多用户的 Agent 运行与治理能力。每个用户在独立的 Docker 沙盒中运行自己的 Agent 会话与工作流。
 
@@ -19,10 +20,11 @@
 - **🌐 网络访问** - 支持 API 调用、包安装、网络爬取
 - **🔒 安全治理** - 自动化安全审查与最小权限能力限制
 - **📦 资产沉淀** - 技能/工作流/工具可复用并共享到平台
+- **🧩 自由组合** - 支持定制多种 Agent，面向自己或团队共享，技能包可自由组合与复用
 
 ## 系统架构
 
-AgentClaw 采用 **frameClaw** 多租户架构：共享实例 + 动态沙盒：
+AgentClaw 基于openclaw为基础采用多租户架构：共享openclaw实例 + 动态agent沙盒：
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -55,7 +57,7 @@ AgentClaw 采用 **frameClaw** 多租户架构：共享实例 + 动态沙盒：
 
 ### 零侵入集成
 
-frameClaw **不修改 OpenClaw 源码**，通过 Bridge 适配层实现多租户能力：
+agentClaw **不修改 OpenClaw 源码**，通过 Bridge 适配层实现多租户能力：
 
 ```
 OpenClaw (上游源码)
@@ -192,7 +194,7 @@ timeout 30 python3 scripts/main.py
 
 ```
 .
-├── bridge/              # Bridge 适配层 - frameClaw 核心 (Node.js)
+├── bridge/              # Bridge 适配层
 │   ├── config.ts        # OpenClaw 多租户配置生成
 │   ├── server.ts        # HTTP API + WebSocket 中继
 │   └── routes/          # Agents、Skills、Files API
