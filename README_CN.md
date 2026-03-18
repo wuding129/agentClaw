@@ -197,12 +197,14 @@ timeout 30 python3 scripts/main.py
 │
 └── docker-compose.yml   # 多服务编排
 ```
+## 交流
+微信wdyt1008521
 
 ## 安全设计
 
 | 层面 | 措施 |
 |------|------|
-| API Key 隔离 | 所有 LLM API Key 仅存在于 Gateway 环境变量 |
+| API Key 隔离 | LLM API Key 存于 Gateway  |
 | 沙盒执行 | 代码在 Docker 容器运行，资源受限，无法逃逸 |
 | 文件隔离 | 每用户独立 workspace，跨用户不可访问 |
 | 网络隔离 | 沙盒允许出站，禁止入站 |
