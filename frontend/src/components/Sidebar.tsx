@@ -45,8 +45,13 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
       label: '技能',
       items: [
         { to: '/skills', icon: Zap, label: '技能商店' },
-        { to: '/chat', icon: MessageSquare, label: '会话' },
         { to: '/files', icon: FolderOpen, label: '文件管理' },
+      ],
+    },
+    {
+      label: '会话',
+      items: [
+        { to: '/chat', icon: MessageSquare, label: '会话' },
       ],
     },
     {
