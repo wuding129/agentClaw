@@ -317,3 +317,142 @@ async def list_tiers():
             quota_daily_tokens=daily_tokens,
         ))
     return tiers
+
+
+# ---------------------------------------------------------------------------
+# Tier migration
+# ---------------------------------------------------------------------------
+
+
+class MigrateUserRequest(BaseModel):
+    direction: str  # "upgrade" or "downgrade"
+
+
+class MigrationStatusResponse(BaseModel):
+    id: str
+    user_id: str
+    direction: str
+    from_tier: str
+    to_tier: str
+    status: str
+    error: str | None = None
+    created_at: datetime
+    completed_at: datetime | None = None
+
+
+@router.post("/users/{user_id}/migrate", response_model=MigrationStatusResponse)
+async def migrate_user_tier(
+    user_id: str,
+    req: MigrateUserRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Trigger a tier migration for a user.
+
+    This is a potentially long-running operation (seconds to minutes).
+    Returns immediately with a migration ID; use GET /admin/migrations/{id} to track progress.
+    """
+    from app.agentcore.config.tiers import TierConfigManager
+    from app.agentcore.migration import TierMigrationService
+    from app.agentcore.router import get_router
+    from app.container.dedicated_manager import get_container_manager
+    from app.db.models import User
+    from sqlalchemy import select
+
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    tm = TierConfigManager()
+    current_tier = user.quota_tier
+    target_tier = req.direction
+
+    # Validate direction
+    if req.direction == "upgrade":
+        if current_tier in ("pro", "enterprise"):
+            raise HTTPException(status_code=400, detail=f"User is already {current_tier}")
+        target_tier_name = "pro" if current_tier in ("free", "basic") else "enterprise"
+    elif req.direction == "downgrade":
+        if current_tier not in ("pro", "enterprise"):
+            raise HTTPException(status_code=400, detail=f"User is already {current_tier}")
+        target_tier_name = "free"
+    else:
+        raise HTTPException(status_code=400, detail=f"Invalid direction: {req.direction}")
+
+    router = get_router()
+    cm = get_container_manager()
+
+    service = TierMigrationService(
+        container_manager=cm,
+        shared_adapter=router._shared_adapter,
+    )
+
+    try:
+        if req.direction == "upgrade":
+            record = await service.upgrade(user_id)
+        else:
+            record = await service.downgrade(user_id)
+        return MigrationStatusResponse(
+            id=record.id,
+            user_id=record.user_id,
+            direction=record.direction,
+            from_tier=record.from_tier,
+            to_tier=record.to_tier,
+            status=record.status.value,
+            error=record.error,
+            created_at=record.created_at,
+            completed_at=record.completed_at,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/migrations/{migration_id}", response_model=MigrationStatusResponse)
+async def get_migration_status(migration_id: str, db: AsyncSession = Depends(get_db)):
+    """Get the status of a migration."""
+    from sqlalchemy import text
+
+    result = await db.execute(
+        text("SELECT * FROM tier_migrations WHERE id = :id"),
+        {"id": migration_id},
+    )
+    row = result.mappings().first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Migration not found")
+    return MigrationStatusResponse(
+        id=row["id"],
+        user_id=row["user_id"],
+        direction=row["direction"],
+        from_tier=row["from_tier"],
+        to_tier=row["to_tier"],
+        status=row["status"],
+        error=row.get("error"),
+        created_at=row["created_at"],
+        completed_at=row.get("completed_at"),
+    )
+
+
+@router.get("/users/{user_id}/migrations", response_model=list[MigrationStatusResponse])
+async def list_user_migrations(user_id: str, db: AsyncSession = Depends(get_db)):
+    """List all migrations for a user."""
+    from sqlalchemy import text
+
+    result = await db.execute(
+        text("SELECT * FROM tier_migrations WHERE user_id = :uid ORDER BY created_at DESC"),
+        {"uid": user_id},
+    )
+    rows = result.mappings().all()
+    return [
+        MigrationStatusResponse(
+            id=row["id"],
+            user_id=row["user_id"],
+            direction=row["direction"],
+            from_tier=row["from_tier"],
+            to_tier=row["to_tier"],
+            status=row["status"],
+            error=row.get("error"),
+            created_at=row["created_at"],
+            completed_at=row.get("completed_at"),
+        )
+        for row in rows
+    ]

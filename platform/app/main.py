@@ -153,6 +153,32 @@ async def _run_database_migrations() -> None:
             """))
             logger.info("Created dedicated_containers table successfully")
 
+        # Migration: Create tier_migrations table for migration records
+        result = await conn.execute(text("""
+            SELECT 1 FROM information_schema.tables
+            WHERE table_name = 'tier_migrations'
+        """))
+        if not result.scalar():
+            logger.info("Creating tier_migrations table...")
+            await conn.execute(text("""
+                CREATE TABLE tier_migrations (
+                    id VARCHAR(36) PRIMARY KEY,
+                    user_id VARCHAR(36) NOT NULL,
+                    direction VARCHAR(16) NOT NULL,
+                    from_tier VARCHAR(20) NOT NULL,
+                    to_tier VARCHAR(20) NOT NULL,
+                    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+                    steps JSONB,
+                    error TEXT,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    completed_at TIMESTAMP
+                )
+            """))
+            await conn.execute(text("""
+                CREATE INDEX ix_tier_migrations_user_id ON tier_migrations(user_id)
+            """))
+            logger.info("Created tier_migrations table successfully")
+
 
 async def _cleanup_temp_skill_submissions() -> None:
     """Clean up expired temporary skill submission files (older than 7 days)."""
