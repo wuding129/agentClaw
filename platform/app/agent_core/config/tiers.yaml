@@ -1,0 +1,79 @@
+tiers:
+  free:
+    backend: shared
+    max_agents: 2
+    max_sessions_per_agent: 10
+    sandbox:
+      mode: docker
+      scope: agent
+      memory: "2g"
+      cpus: 2
+      prune_idle_hours: 2
+    features:
+      skills: true
+      knowledge_base: false
+      cron_jobs: false
+      channels: false
+      api_access: false
+    quota:
+      daily_tokens: 20000000
+
+  basic:
+    backend: shared
+    max_agents: 5
+    max_sessions_per_agent: 50
+    sandbox:
+      mode: docker
+      scope: agent
+      memory: "2g"
+      cpus: 2
+      prune_idle_hours: 4
+    features:
+      skills: true
+      knowledge_base: true
+      cron_jobs: true
+      channels: false
+      api_access: false
+    quota:
+      daily_tokens: 100000000
+
+  pro:
+    backend: dedicated
+    max_agents: 20
+    max_sessions_per_agent: -1  # unlimited
+    container:
+      image: "openclaw:latest"
+      memory: "4g"
+      cpus: 2
+      pids_limit: 512
+      auto_stop_hours: 24
+      auto_destroy_days: 90
+    features:
+      skills: true
+      knowledge_base: true
+      cron_jobs: true
+      channels: true
+      api_access: true
+    quota:
+      daily_tokens: 1000000000
+
+  enterprise:
+    backend: dedicated
+    max_agents: -1  # unlimited
+    max_sessions_per_agent: -1
+    container:
+      image: "openclaw:latest"
+      memory: "8g"
+      cpus: 4
+      pids_limit: 1024
+      auto_stop_hours: 168
+      auto_destroy_days: 365
+    features:
+      skills: true
+      knowledge_base: true
+      cron_jobs: true
+      channels: true
+      api_access: true
+      custom_sandbox: true
+    quota:
+      daily_tokens: -1  # unlimited
