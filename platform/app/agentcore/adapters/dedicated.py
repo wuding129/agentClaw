@@ -6,13 +6,15 @@ Docker container, managed by DedicatedContainerManager.
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import hmac
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Callable
+
+if TYPE_CHECKING:
+    from app.container.dedicated_manager import DedicatedContainerManager
 
 import httpx
 
@@ -66,7 +68,7 @@ class DedicatedOpenClawAdapter(IAgentCore):
     def __init__(
         self,
         user_id: str,
-        container_manager: Any,  # DedicatedContainerManager
+        container_manager: "DedicatedContainerManager",
     ):
         self.user_id = user_id
         self.instance_id = f"dedicated-{user_id}"
@@ -90,23 +92,42 @@ class DedicatedOpenClawAdapter(IAgentCore):
         Called by AgentCoreRouter when provisioning a dedicated adapter.
         """
         tier_config = await self._cm._tier_config_for_user(self.user_id)
-        await self._cm.ensure_running(self.user_id, tier_config)
+        info = await self._cm.ensure_running(self.user_id, tier_config)
+        self.set_token(info.container_token)
 
     def _bridge_headers(self, agent_id: str, is_admin: bool = False) -> dict[str, str]:
-        """Build bridge request headers (uses container token)."""
-        # Container token is stored in DB; for now use bridge_token as fallback
-        token = settings.bridge_token
+        """Build bridge request headers using the container's own token."""
+        # Token is loaded lazily from container info on first call per adapter instance
+        if not hasattr(self, "_cached_token") or not self._cached_token:
+            # Synchronous access: get from cache if available, else leave empty
+            # The token is set during ensure_running flow via set_token()
+            pass
+        token = getattr(self, "_cached_token", "") or settings.bridge_token
         return {
             "X-Agent-Id": agent_id,
             "X-Agent-Id-Sig": _sign_agent_id(agent_id, token),
             "X-Is-Admin": "true" if is_admin else "false",
         }
 
+    def set_token(self, token: str) -> None:
+        """Set the container token after initialization."""
+        self._cached_token = token
+
+    async def _ensure_token(self) -> str:
+        """Ensure we have the current container token, refreshing if needed."""
+        info = await self._cm.get_status(self.user_id)
+        if info and info.container_token:
+            self.set_token(info.container_token)
+        return getattr(self, "_cached_token", "") or settings.bridge_token
+
     async def _get_bridge_url(self) -> str:
         """Get the bridge URL from the container info."""
         info = await self._cm.get_status(self.user_id)
         if info is None:
             raise RuntimeError(f"No container found for user {self.user_id}")
+        if info.container_token:
+            self.set_token(info.container_token)
+        return info.bridge_url
         return info.bridge_url
 
     def _normalize_event(self, raw: dict[str, Any]) -> CoreEvent:
@@ -206,13 +227,16 @@ class DedicatedOpenClawAdapter(IAgentCore):
         """Send a message via WebSocket relay."""
         import websockets
 
-        # Record activity on every message
-        asyncio.create_task(self._cm.record_activity(self.user_id))
-
-        scoped_session = f"agent:{agent_id}:{session_key}"
+        # Ensure container is running and token is current
         info = await self._cm.get_status(self.user_id)
         if info is None:
             raise RuntimeError(f"No container for user {self.user_id}")
+        self.set_token(info.container_token)
+
+        # Record activity on every message
+        await self._cm.record_activity(self.user_id)
+
+        scoped_session = f"agent:{agent_id}:{session_key}"
 
         ws_url = info.gateway_ws_url.replace("ws://", "ws://").rstrip("/")
         if not ws_url.endswith("/ws"):

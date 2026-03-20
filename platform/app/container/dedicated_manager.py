@@ -60,6 +60,7 @@ class ContainerInfo:
     bridge_url: str  # e.g. "http://172.17.0.x:18080"
     gateway_ws_url: str  # e.g. "ws://172.17.0.x:18789"
     status: str  # creating / running / stopped / error
+    container_token: str = ""  # token for LLM proxy auth within the container
     created_at: datetime = field(default_factory=datetime.utcnow)
     last_active_at: datetime = field(default_factory=datetime.utcnow)
     auto_stop_hours: int = 24
@@ -98,6 +99,12 @@ class DedicatedContainerManager:
         self._workspace_vol_prefix = "openclaw-workspace-user-"
         self._sessions_vol_prefix = "openclaw-sessions-user-"
 
+        # TierConfigManager lazy singleton (avoid circular import at module level)
+        self._tier_manager = None
+
+        # Ensure Docker network exists once at startup
+        _ensure_network()
+
     def _lock(self, user_id: str) -> asyncio.Lock:
         """Get or create a lock for a specific user."""
         if user_id not in self._locks:
@@ -105,12 +112,18 @@ class DedicatedContainerManager:
         return self._locks[user_id]
 
     async def _tier_config_for_user(self, user_id: str) -> "TierConfig":
-        """Look up a user's TierConfig from DB."""
+        """Look up a user's TierConfig from DB.
+
+        Raises:
+            ValueError: if the user's tier is not a dedicated backend.
+        """
         from sqlalchemy import text
-        from app.agentcore.config.tiers import TierConfigManager
         from app.db.engine import async_session
 
-        tm = TierConfigManager()
+        if self._tier_manager is None:
+            from app.agentcore.config.tiers import TierConfigManager
+            self._tier_manager = TierConfigManager()
+
         async with async_session() as db:
             result = await db.execute(
                 text("SELECT quota_tier FROM users WHERE id = :uid"),
@@ -118,7 +131,14 @@ class DedicatedContainerManager:
             )
             row = result.mappings().first()
             tier_name = row["quota_tier"] if row else "pro"
-        return tm.get_tier(tier_name)
+        tier = self._tier_manager.get_tier(tier_name)
+        if tier.backend != "dedicated":
+            raise ValueError(
+                f"User {user_id} has tier '{tier_name}' (backend={tier.backend}), "
+                f"but dedicated adapter requires backend='dedicated'. "
+                f"Check AgentCoreRouter routing logic."
+            )
+        return tier
 
     # -------------------------------------------------------------------------
     # Public API
@@ -241,7 +261,6 @@ class DedicatedContainerManager:
         self, user_id: str, tier: "TierConfig"
     ) -> ContainerInfo:
         """Create a new dedicated container for a user."""
-        _ensure_network()
         client = _docker()
 
         container_name = f"openclaw-user-{user_id}"
@@ -306,6 +325,7 @@ class DedicatedContainerManager:
             bridge_url=f"http://{ip}:{self._bridge_port}",
             gateway_ws_url=f"ws://{ip}:{self._gateway_port}",
             status="creating",
+            container_token=container_token,
             created_at=datetime.utcnow(),
             last_active_at=datetime.utcnow(),
             auto_stop_hours=auto_stop,
@@ -317,7 +337,7 @@ class DedicatedContainerManager:
         info.status = "running"
 
         # Persist to DB
-        await self._save_container_info(info, container_token)
+        await self._save_container_info(info)
 
         self._containers[user_id] = info
         logger.info(
@@ -415,9 +435,7 @@ class DedicatedContainerManager:
             row = result.mappings().first()
             return dict(row) if row else None
 
-    async def _save_container_info(
-        self, info: ContainerInfo, container_token: str
-    ) -> None:
+    async def _save_container_info(self, info: ContainerInfo) -> None:
         """Save container info to DB (upsert)."""
         from sqlalchemy import insert, text, update
         from app.db.engine import async_session
@@ -459,7 +477,7 @@ class DedicatedContainerManager:
                         docker_id=info.container_id,
                         bridge_url=info.bridge_url,
                         gateway_ws_url=info.gateway_ws_url,
-                        container_token=container_token,
+                        container_token=info.container_token,
                         status=info.status,
                         created_at=info.created_at,
                         last_active_at=info.last_active_at,
@@ -480,6 +498,7 @@ class DedicatedContainerManager:
             bridge_url=row["bridge_url"] or "",
             gateway_ws_url=row["gateway_ws_url"] or "",
             status=row["status"] or "stopped",
+            container_token=row.get("container_token") or "",
             created_at=row["created_at"] or datetime.utcnow(),
             last_active_at=row["last_active_at"] or datetime.utcnow(),
             auto_stop_hours=row.get("auto_stop_hours") or 24,
@@ -541,37 +560,34 @@ class DedicatedContainerManager:
 
     async def _check_idle_containers(self) -> None:
         """Check all dedicated containers and stop/destroy as needed."""
-        from sqlalchemy import select, text
+        from sqlalchemy import text
         from app.db.engine import async_session
 
         async with async_session() as db:
             result = await db.execute(
-                text("SELECT user_id, status, last_active_at, auto_stop_hours, auto_destroy_days FROM dedicated_containers")
+                text("SELECT user_id FROM dedicated_containers")
             )
-            rows = result.mappings().all()
+            user_ids = [row["user_id"] for row in result.mappings().all()]
 
         now = datetime.utcnow()
         stopped = 0
         destroyed = 0
 
-        for row in rows:
-            user_id = row["user_id"]
-            status = row["status"]
-            last_active = row["last_active_at"]
-            auto_stop_hours = row.get("auto_stop_hours") or 24
-            auto_destroy_days = row.get("auto_destroy_days") or 90
+        for user_id in user_ids:
+            info = await self._load_container_info(user_id)
+            if info is None:
+                continue
+            idle_hours = (now - info.last_active_at).total_seconds() / 3600
 
-            idle_hours = (now - last_active).total_seconds() / 3600
-
-            if status == "running" and idle_hours >= auto_stop_hours:
+            if info.status == "running" and idle_hours >= info.auto_stop_hours:
                 await self.stop(user_id)
                 stopped += 1
-                logger.info("Idle stop: user %s (idle %.1fh > %dh)", user_id, idle_hours, auto_stop_hours)
+                logger.info("Idle stop: user %s (idle %.1fh > %dh)", user_id, idle_hours, info.auto_stop_hours)
 
-            elif status == "stopped" and idle_hours >= auto_destroy_days * 24:
+            elif info.status == "stopped" and idle_hours >= info.auto_destroy_days * 24:
                 await self.destroy(user_id)
                 destroyed += 1
-                logger.info("Idle destroy: user %s (idle %.1fd > %dd)", user_id, idle_hours / 24, auto_destroy_days)
+                logger.info("Idle destroy: user %s (idle %.1fd > %dd)", user_id, idle_hours / 24, info.auto_destroy_days)
 
         if stopped or destroyed:
             logger.info("Idle check complete: %d stopped, %d destroyed", stopped, destroyed)
