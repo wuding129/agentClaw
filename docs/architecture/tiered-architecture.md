@@ -116,7 +116,7 @@ MultiUserClaw 证明了 **per-tenant 完整 OpenClaw 可行**，其 `platform/co
 所有 agent core 适配器必须实现以下契约：
 
 ```python
-# platform/app/agent_core/interfaces.py
+# app.agentcore/interfaces.py
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -339,7 +339,7 @@ class IAgentCore(ABC):
 不同 backend 的事件格式统一规范为 `CoreEvent`：
 
 ```python
-# platform/app/agent_core/events.py
+# app.agentcore/events.py
 
 class EventType(Enum):
     MESSAGE = "message"                    # 文本消息
@@ -510,7 +510,7 @@ class TierConfigManager:
 ### 6.1 核心路由逻辑
 
 ```python
-# platform/app/agent_core/router.py
+# app.agentcore/router.py
 
 from app.agentcore.interfaces import IAgentCore, BackendType
 from app.agentcore.adapters import (
@@ -633,7 +633,7 @@ async def chat_ws(agent_id: str, session_key: str, user_id: str):
 复用现有 bridge 逻辑，封装为 `IAgentCore` 接口：
 
 ```python
-# platform/app/agent_core/adapters/shared.py
+# app.agentcore/adapters/shared.py
 
 class SharedOpenClawAdapter(IAgentCore):
     """
@@ -713,7 +713,7 @@ class SharedOpenClawAdapter(IAgentCore):
 per-user 独立 OpenClaw 容器封装：
 
 ```python
-# platform/app/agent_core/adapters/dedicated.py
+# app.agentcore/adapters/dedicated.py
 
 class DedicatedOpenClawAdapter(IAgentCore):
     """
@@ -1221,28 +1221,30 @@ platform/app/
 
 ## 十五、实现计划
 
-### Phase 0: 接口抽象（不改行为）
+### Phase 0: 接口抽象（不改行为） — ✅ DONE
 
-- [ ] 定义 `IAgentCore` 接口 + `CoreEvent` 事件规范
-- [ ] 实现 `SharedOpenClawAdapter`，委托给现有 bridge HTTP API
-- [ ] 实现 `TierConfigManager`，加载 `tiers.yaml`
-- [ ] 实现 `AgentCoreRouter`，默认全走 shared adapter
-- [ ] 修改现有 route handlers 通过 router 代理
-- [ ] **验证**：所有现有功能不受影响
+- [x] 定义 `IAgentCore` 接口 + `CoreEvent` 事件规范
+- [x] 实现 `SharedOpenClawAdapter`，委托给现有 bridge HTTP API
+- [x] 实现 `TierConfigManager`，加载 `tiers.yaml`
+- [x] 实现 `AgentCoreRouter`，默认全走 shared adapter
+- [x] 修改现有 route handlers 通过 router 代理
+- [x] **验证**：所有现有功能不受影响
 
-### Phase 1: Tier 配置化
+### Phase 1: Tier 配置化 — ✅ DONE
 
-- [ ] DB 迁移：`users.quota_tier`
-- [ ] `DedicatedContainerManager` 骨架（create / stop / destroy）
-- [ ] Admin 界面：用户 tier 管理
-- [ ] **验证**：Admin 可修改用户 tier
+- [x] DB 迁移：`users.quota_tier`（字段已存在，无需 migration）
+- [x] `AgentCoreRouter._get_user_tier()` 读取 DB
+- [x] Admin endpoint 加 tier 校验 + `GET /api/admin/tiers` 列表
+- [x] **验证**：Admin 可修改用户 tier
 
-### Phase 2: Dedicated 基础设施
+### Phase 2: Dedicated 基础设施 — ✅ DONE
 
-- [ ] 完整 `DedicatedContainerManager` 实现
-- [ ] `DedicatedOpenClawAdapter` 实现
-- [ ] LLM Proxy 支持 container_token 认证
-- [ ] 后台 idle checker 定时任务
+- [x] 完整 `DedicatedContainerManager` 实现（create / start / stop / destroy / idle-check）
+- [x] `DedicatedOpenClawAdapter` 实现
+- [x] `DedicatedContainerManager` 接入 lifespan（idle checker 随 app 启动/关闭）
+- [x] DB migration：`dedicated_containers` 表（auto on startup）
+- [x] `AgentCoreRouter` tier 路由（free/basic → shared, pro/enterprise → dedicated）
+- [ ] LLM Proxy 支持 container_token 认证（container_token 已在 DB，proxy 层待接入）
 - [ ] **验证**：Pro 用户有独立容器
 
 ### Phase 3: 数据迁移
