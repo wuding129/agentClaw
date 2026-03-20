@@ -34,10 +34,22 @@ class UserSummary(BaseModel):
     container_memory_percent: float | None = None
 
 
+# Valid tier names — must match tiers.yaml
+VALID_TIERS = frozenset({"free", "basic", "pro", "enterprise"})
+
+
 class UpdateUserRequest(BaseModel):
     role: str | None = None
     quota_tier: str | None = None
     is_active: bool | None = None
+
+    def validate_tier(self) -> str | None:
+        """Validate quota_tier value. Returns error message or None if valid."""
+        if self.quota_tier is None:
+            return None
+        if self.quota_tier not in VALID_TIERS:
+            return f"Invalid quota_tier '{self.quota_tier}'. Must be one of: {', '.join(sorted(VALID_TIERS))}"
+        return None
 
 
 async def _delete_agent_by_openclaw_id(openclaw_agent_id: str) -> bool:
@@ -137,6 +149,11 @@ async def update_user(user_id: str, req: UpdateUserRequest, db: AsyncSession = D
     user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Validate tier before applying
+    tier_error = req.validate_tier()
+    if tier_error:
+        raise HTTPException(status_code=400, detail=tier_error)
 
     values = {k: v for k, v in req.model_dump().items() if v is not None}
     if values:
@@ -264,3 +281,39 @@ async def update_platform_config(body: PlatformConfigUpdate):
             raise HTTPException(status_code=400, detail="max_agents_per_user must be >= 1")
         settings.max_agents_per_user = body.max_agents_per_user
     return PlatformConfigResponse(max_agents_per_user=settings.max_agents_per_user)
+
+
+# ---------------------------------------------------------------------------
+# Tier management
+# ---------------------------------------------------------------------------
+
+
+class TierInfo(BaseModel):
+    name: str
+    backend: str
+    max_agents: int | None
+    max_sessions_per_agent: int | None
+    features: dict[str, bool]
+    quota_daily_tokens: int | None
+
+
+@router.get("/tiers", response_model=list[TierInfo])
+async def list_tiers():
+    """List all available tiers with their configuration."""
+    from app.agentcore.config.tiers import TierConfigManager
+
+    tm = TierConfigManager()
+    tiers = []
+    for name, cfg in tm.get_all_tiers().items():
+        daily_tokens = None
+        if cfg.quota:
+            daily_tokens = cfg.quota.get("daily_tokens")
+        tiers.append(TierInfo(
+            name=name,
+            backend=cfg.backend,
+            max_agents=cfg.max_agents,
+            max_sessions_per_agent=cfg.max_sessions_per_agent,
+            features=cfg.features or {},
+            quota_daily_tokens=daily_tokens,
+        ))
+    return tiers
