@@ -1,11 +1,13 @@
 """AgentCoreRouter — unified routing layer for all agent backend operations.
 
-Phase 0: This router defaults all users to the shared OpenClaw backend.
-Future phases will add dedicated adapter pools and multi-instance routing.
+Phase 0: All users route to shared OpenClaw.
+Phase 1: Tier config wired to DB (quota_tier field).
+Phase 2: Pro/Enterprise users route to dedicated containers.
 """
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any, Callable
 
 from app.agentcore.adapters import SharedOpenClawAdapter
@@ -54,25 +56,25 @@ class AgentCoreRouter:
     ) -> None:
         self._tier_config = tier_config or TierConfigManager()
 
-        # Phase 0: Single shared adapter for all users
         self._shared_adapter = SharedOpenClawAdapter()
-
-        # Future: dedicated adapter pool {user_id: DedicatedOpenClawAdapter}
         self._dedicated_adapters: dict[str, IAgentCore] = {}
+        self._cm = None  # DedicatedContainerManager, lazy init
 
-        # Future: adapter factory for dedicated mode
-        self._dedicated_factory: type[IAgentCore] | None = None
+    def _get_cm(self):
+        if self._cm is None:
+            from app.container.dedicated_manager import get_container_manager
+            self._cm = get_container_manager()
+        return self._cm
 
     # -------------------------------------------------------------------------
     # Adapter resolution
     # -------------------------------------------------------------------------
 
     async def get_adapter(self, user_id: str) -> IAgentCore:
-        """
-        Resolve the appropriate IAgentCore adapter for a user.
+        """Resolve the IAgentCore adapter for a user based on their tier.
 
-        Phase 0: Always returns the shared adapter.
-        Future: Checks user.tier and returns shared or dedicated.
+        free/basic → SharedOpenClawAdapter
+        pro/enterprise → DedicatedOpenClawAdapter
         """
         tier_name = await self._get_user_tier(user_id)
         tier = self._tier_config.get_tier(tier_name)
@@ -80,16 +82,21 @@ class AgentCoreRouter:
         if tier.backend == "shared":
             return self._shared_adapter
 
-        # Future: dedicated backend
         if user_id not in self._dedicated_adapters:
-            if self._dedicated_factory is None:
-                # Fallback to shared if no dedicated factory configured
-                return self._shared_adapter
-            adapter = self._dedicated_factory()
-            await adapter.initialize()
-            self._dedicated_adapters[user_id] = adapter
+            await self._provision_dedicated(user_id, tier)
 
         return self._dedicated_adapters[user_id]
+
+    async def _provision_dedicated(
+        self, user_id: str, tier: TierConfig
+    ) -> None:
+        """Create and cache a dedicated adapter for a user."""
+        from app.agentcore.adapters.dedicated import DedicatedOpenClawAdapter
+
+        cm = self._get_cm()
+        adapter = DedicatedOpenClawAdapter(user_id=user_id, container_manager=cm)
+        await adapter.initialize()
+        self._dedicated_adapters[user_id] = adapter
 
     async def get_adapter_for_agent(
         self, user_id: str, agent_id: str
@@ -284,6 +291,16 @@ class AgentCoreRouter:
         for adapter in self._dedicated_adapters.values():
             await adapter.close()
         self._dedicated_adapters.clear()
+
+    async def startup_idle_checker(self) -> asyncio.Task | None:
+        """Start the background idle checker for dedicated containers.
+
+        Returns the task so it can be cancelled on shutdown.
+        """
+        if self._cm is None:
+            self._get_cm()
+        task = asyncio.create_task(self._cm.run_idle_checker())
+        return task
 
 
 # -----------------------------------------------------------------------------

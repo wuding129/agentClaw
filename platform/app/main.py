@@ -130,7 +130,28 @@ async def _run_database_migrations() -> None:
             """))
             logger.info("Created user_agents table successfully")
 
-        # Future migrations can be added here following the same pattern
+        # Migration: Create dedicated_containers table for per-user OpenClaw instances
+        result = await conn.execute(text("""
+            SELECT 1 FROM information_schema.tables
+            WHERE table_name = 'dedicated_containers'
+        """))
+        if not result.scalar():
+            logger.info("Creating dedicated_containers table...")
+            await conn.execute(text("""
+                CREATE TABLE dedicated_containers (
+                    user_id VARCHAR(36) PRIMARY KEY,
+                    docker_id VARCHAR(128),
+                    bridge_url VARCHAR(256),
+                    gateway_ws_url VARCHAR(256),
+                    container_token VARCHAR(128) NOT NULL,
+                    status VARCHAR(16) DEFAULT 'creating',
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    last_active_at TIMESTAMP DEFAULT NOW(),
+                    auto_stop_hours INTEGER DEFAULT 24,
+                    auto_destroy_days INTEGER DEFAULT 90
+                )
+            """))
+            logger.info("Created dedicated_containers table successfully")
 
 
 async def _cleanup_temp_skill_submissions() -> None:
@@ -252,14 +273,24 @@ async def lifespan(app: FastAPI):
     # Start background task for periodic cleanup (every 6 hours)
     cleanup_task = asyncio.create_task(_periodic_cleanup())
 
+    # Start dedicated container idle checker (every hour)
+    from app.agentcore.router import get_router
+    router = get_router()
+    idle_task = await router.startup_idle_checker()
+
     yield
 
-    # Cancel cleanup task on shutdown
+    # Cancel background tasks on shutdown
     cleanup_task.cancel()
-    try:
-        await cleanup_task
-    except asyncio.CancelledError:
-        pass
+    if idle_task:
+        idle_task.cancel()
+    for t in (cleanup_task, idle_task):
+        if t:
+            try:
+                await t
+            except asyncio.CancelledError:
+                pass
+    await router.shutdown()
     await engine.dispose()
 
 
