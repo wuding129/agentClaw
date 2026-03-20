@@ -512,12 +512,12 @@ class TierConfigManager:
 ```python
 # platform/app/agent_core/router.py
 
-from platform.app.agent_core.interfaces import IAgentCore, BackendType
-from platform.app.agent_core.adapters import (
+from app.agentcore.interfaces import IAgentCore, BackendType
+from app.agentcore.adapters import (
     SharedOpenClawAdapter,
     DedicatedOpenClawAdapter,
 )
-from platform.app.agent_core.config import TierConfigManager
+from app.agentcore.config import TierConfigManager
 
 class AgentCoreRouter:
     """
@@ -606,7 +606,7 @@ Platform Gateway 的 route handler 完全不需要知道用户是哪个 tier：
 ```python
 # platform/app/routes/agents.py
 
-from platform.app.agent_core.router import AgentCoreRouter
+from app.agentcore.router import AgentCoreRouter
 
 router = AgentCoreRouter(...)
 
@@ -1201,37 +1201,20 @@ class ClaudeCodeAdapter(IAgentCore):
 ## 十四、文件变更清单
 
 ```
-platform/
-├── app/
-│   ├── agent_core/                    # NEW: 核心抽象层
+platform/app/
+├── agentcore/                      # NEW: 核心抽象层 (避开了 stdlib `platform` 冲突)
+│   ├── __init__.py
+│   ├── interfaces.py              # IAgentCore 接口定义
+│   ├── router.py                   # AgentCoreRouter
+│   ├── adapters/                   # Adapter 实现
 │   │   ├── __init__.py
-│   │   ├── interfaces.py              # IAgentCore 接口定义
-│   │   ├── events.py                  # CoreEvent / EventType
-│   │   ├── router.py                   # AgentCoreRouter
-│   │   ├── adapters/                   # Adapter 实现
-│   │   │   ├── __init__.py
-│   │   │   ├── shared.py               # SharedOpenClawAdapter
-│   │   │   └── dedicated.py            # DedicatedOpenClawAdapter
-│   │   └── config/
-│   │       ├── __init__.py
-│   │       ├── tiers.py                # TierConfigManager
-│   │       └── tiers.yaml              # Tier 配置
-│   ├── container/                     # NEW: 容器管理
-│   │   ├── __init__.py
-│   │   └── dedicated_manager.py        # DedicatedContainerManager
-│   └── routes/
-│       ├── agents.py                   # MODIFY: 改用 router
-│       ├── proxy.py                    # MODIFY: 改用 router
-│       └── skills.py                   # MODIFY: 改用 router
-│
-├── config/
-│   └── tiers.yaml                     # NEW: Tier 配置
-│
-└── db/
-    └── migrations/
-        ├── add_quota_tier.py           # NEW: DB 迁移
-        ├── add_backend_type.py         # NEW: DB 迁移
-        └── add_container_tier.py        # NEW: DB 迁移
+│   │   ├── shared.py             # SharedOpenClawAdapter
+│   │   └── dedicated.py           # DedicatedOpenClawAdapter (Phase 2)
+│   └── config/
+│       ├── __init__.py
+│       ├── tiers.py               # TierConfigManager
+│       └── tiers.yaml             # Tier 配置
+└── ...existing routes unchanged...
 ```
 
 ---

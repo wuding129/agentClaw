@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable
 
-from app.agent_core.adapters import SharedOpenClawAdapter
-from app.agent_core.config.tiers import TierConfigManager
-from app.agent_core.interfaces import (
+from app.agentcore.adapters import SharedOpenClawAdapter
+from app.agentcore.config.tiers import TierConfigManager
+from app.agentcore.interfaces import (
     AgentConfig,
     AgentStatus,
     BackendType,
@@ -22,7 +22,7 @@ from app.agent_core.interfaces import (
     SkillInfo,
     WorkspaceFile,
 )
-from app.agent_core.config.tiers import TierConfig
+from app.agentcore.config.tiers import TierConfig
 
 if TYPE_CHECKING:
     from pathlib import Path

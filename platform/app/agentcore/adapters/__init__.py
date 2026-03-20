@@ -1,6 +1,6 @@
 """Agent core adapters — pluggable implementations of IAgentCore."""
 
-from app.agent_core.adapters.shared import (
+from app.agentcore.adapters.shared import (
     AgentCoreError,
     AgentCreationError,
     AgentDeletionError,

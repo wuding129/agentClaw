@@ -10,7 +10,7 @@ All existing routes continue to work unchanged. Phase 0 adds the abstraction
 without changing behaviour.
 """
 
-from app.agent_core.interfaces import (
+from app.agentcore.interfaces import (
     AgentConfig,
     AgentStatus,
     BackendType,
@@ -23,7 +23,7 @@ from app.agent_core.interfaces import (
     SkillInfo,
     WorkspaceFile,
 )
-from app.agent_core.adapters import (
+from app.agentcore.adapters import (
     SharedOpenClawAdapter,
     AgentCoreError,
     AgentCreationError,
@@ -31,8 +31,8 @@ from app.agent_core.adapters import (
     BackendUnavailableError,
     SkillInstallError,
 )
-from app.agent_core.config.tiers import TierConfig, TierConfigManager
-from app.agent_core.router import AgentCoreRouter, get_router, set_router
+from app.agentcore.config.tiers import TierConfig, TierConfigManager
+from app.agentcore.router import AgentCoreRouter, get_router, set_router
 
 __all__ = [
     # Interfaces

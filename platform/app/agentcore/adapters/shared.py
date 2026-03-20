@@ -16,7 +16,7 @@ from typing import Any, Callable
 
 import httpx
 
-from app.agent_core.interfaces import (
+from app.agentcore.interfaces import (
     AgentConfig,
     AgentStatus,
     BackendType,
