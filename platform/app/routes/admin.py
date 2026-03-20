@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -354,7 +357,7 @@ async def migrate_user_tier(
     Returns immediately with a migration ID; use GET /admin/migrations/{id} to track progress.
     """
     from app.agentcore.config.tiers import TierConfigManager
-    from app.agentcore.migration import TierMigrationService
+    from app.agentcore.migration import TierMigrationService, MigrationRecord, MigrationStatus
     from app.agentcore.router import get_router
     from app.container.dedicated_manager import get_container_manager
     from app.db.models import User
@@ -389,10 +392,28 @@ async def migrate_user_tier(
     )
 
     try:
-        if req.direction == "upgrade":
-            record = await service.upgrade(user_id)
-        else:
-            record = await service.downgrade(user_id)
+        migration_id = service.gen_id()
+        record = MigrationRecord(
+            id=migration_id,
+            user_id=user_id,
+            direction=req.direction,
+            from_tier=current_tier,
+            to_tier=target_tier_name,
+            status=MigrationStatus.PENDING,
+        )
+        await service.save_record(record)
+
+        async def _run():
+            try:
+                if req.direction == "upgrade":
+                    await service.upgrade(user_id, record)
+                else:
+                    await service.downgrade(user_id, record)
+            except Exception as e:
+                logger.error("Migration %s failed for user %s: %s", migration_id, user_id, e)
+
+        asyncio.create_task(_run())
+
         return MigrationStatusResponse(
             id=record.id,
             user_id=record.user_id,
@@ -400,9 +421,10 @@ async def migrate_user_tier(
             from_tier=record.from_tier,
             to_tier=record.to_tier,
             status=record.status.value,
-            error=record.error,
+            error=None,
             created_at=record.created_at,
-            completed_at=record.completed_at,
+            completed_at=None,
+            steps=[],
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

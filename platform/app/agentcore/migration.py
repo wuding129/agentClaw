@@ -83,7 +83,7 @@ class TierMigrationService:
         self._cm = container_manager
         self._shared = shared_adapter
 
-    async def upgrade(self, user_id: str) -> MigrationRecord:
+    async def upgrade(self, user_id: str, record: MigrationRecord | None = None) -> MigrationRecord:
         """
         Migrate a user from shared to dedicated OpenClaw.
 
@@ -94,24 +94,33 @@ class TierMigrationService:
         from app.db.engine import async_session
         from app.db.models import User, UserAgent
 
-        record = MigrationRecord(
-            id=self._gen_id(),
-            user_id=user_id,
-            direction="upgrade",
-            from_tier="free",
-            to_tier="pro",
-            status=MigrationStatus.PENDING,
-        )
-        steps = [
-            MigrationStep(name="create_container", status="pending"),
-            MigrationStep(name="provision_agents", status="pending"),
-            MigrationStep(name="copy_data", status="pending"),
-            MigrationStep(name="update_routing", status="pending"),
-            MigrationStep(name="update_user_tier", status="pending"),
-            MigrationStep(name="notify", status="pending"),
-        ]
-        record.steps = steps
-        await self._save_record(record)
+        if record is None:
+            record = MigrationRecord(
+                id=self.gen_id(),
+                user_id=user_id,
+                direction="upgrade",
+                from_tier="free",
+                to_tier="pro",
+                status=MigrationStatus.PENDING,
+            )
+            record.steps = [
+                MigrationStep(name="create_container", status="pending"),
+                MigrationStep(name="provision_agents", status="pending"),
+                MigrationStep(name="copy_data", status="pending"),
+                MigrationStep(name="update_routing", status="pending"),
+                MigrationStep(name="update_user_tier", status="pending"),
+                MigrationStep(name="notify", status="pending"),
+            ]
+        elif not record.steps:
+            record.steps = [
+                MigrationStep(name="create_container", status="pending"),
+                MigrationStep(name="provision_agents", status="pending"),
+                MigrationStep(name="copy_data", status="pending"),
+                MigrationStep(name="update_routing", status="pending"),
+                MigrationStep(name="update_user_tier", status="pending"),
+                MigrationStep(name="notify", status="pending"),
+            ]
+        await self.save_record(record)
 
         try:
             # Step 1: Create dedicated container
@@ -191,7 +200,7 @@ class TierMigrationService:
 
             record.status = MigrationStatus.COMPLETED
             record.completed_at = datetime.utcnow()
-            await self._save_record(record)
+            await self.save_record(record)
             logger.info("Migration %s completed for user %s", record.id, user_id)
             return record
 
@@ -199,7 +208,7 @@ class TierMigrationService:
             logger.error("Migration %s failed for user %s: %s", record.id, user_id, e)
             record.status = MigrationStatus.FAILED
             record.error = str(e)
-            await self._save_record(record)
+            await self.save_record(record)
             await self._notify_user(
                 user_id, "upgrade_failed",
                 "Tier Upgrade Failed",
@@ -207,7 +216,7 @@ class TierMigrationService:
             )
             raise
 
-    async def downgrade(self, user_id: str) -> MigrationRecord:
+    async def downgrade(self, user_id: str, record: MigrationRecord | None = None) -> MigrationRecord:
         """
         Migrate a user from dedicated to shared OpenClaw.
 
@@ -217,24 +226,33 @@ class TierMigrationService:
         from app.db.engine import async_session
         from app.db.models import User, UserAgent
 
-        record = MigrationRecord(
-            id=self._gen_id(),
-            user_id=user_id,
-            direction="downgrade",
-            from_tier="pro",
-            to_tier="free",
-            status=MigrationStatus.PENDING,
-        )
-        steps = [
-            MigrationStep(name="provision_shared_agents", status="pending"),
-            MigrationStep(name="copy_data", status="pending"),
-            MigrationStep(name="update_routing", status="pending"),
-            MigrationStep(name="update_user_tier", status="pending"),
-            MigrationStep(name="destroy_container", status="pending"),
-            MigrationStep(name="notify", status="pending"),
-        ]
-        record.steps = steps
-        await self._save_record(record)
+        if record is None:
+            record = MigrationRecord(
+                id=self.gen_id(),
+                user_id=user_id,
+                direction="downgrade",
+                from_tier="pro",
+                to_tier="free",
+                status=MigrationStatus.PENDING,
+            )
+            record.steps = [
+                MigrationStep(name="provision_shared_agents", status="pending"),
+                MigrationStep(name="copy_data", status="pending"),
+                MigrationStep(name="update_routing", status="pending"),
+                MigrationStep(name="update_user_tier", status="pending"),
+                MigrationStep(name="destroy_container", status="pending"),
+                MigrationStep(name="notify", status="pending"),
+            ]
+        elif not record.steps:
+            record.steps = [
+                MigrationStep(name="provision_shared_agents", status="pending"),
+                MigrationStep(name="copy_data", status="pending"),
+                MigrationStep(name="update_routing", status="pending"),
+                MigrationStep(name="update_user_tier", status="pending"),
+                MigrationStep(name="destroy_container", status="pending"),
+                MigrationStep(name="notify", status="pending"),
+            ]
+        await self.save_record(record)
 
         try:
             # Get dedicated container info
@@ -321,7 +339,7 @@ class TierMigrationService:
 
             record.status = MigrationStatus.COMPLETED
             record.completed_at = datetime.utcnow()
-            await self._save_record(record)
+            await self.save_record(record)
             logger.info("Migration %s completed for user %s", record.id, user_id)
             return record
 
@@ -329,7 +347,7 @@ class TierMigrationService:
             logger.error("Migration %s failed for user %s: %s", record.id, user_id, e)
             record.status = MigrationStatus.FAILED
             record.error = str(e)
-            await self._save_record(record)
+            await self.save_record(record)
             raise
 
     # -------------------------------------------------------------------------
@@ -509,7 +527,7 @@ class TierMigrationService:
                 except Exception as e:
                     logger.warning("Failed to copy skills for agent %s: %s", old_id, e)
 
-    def _gen_id(self) -> str:
+    def gen_id(self) -> str:
         import uuid
         return str(uuid.uuid4())
 
@@ -519,7 +537,7 @@ class TierMigrationService:
                 step.status = "running"
                 step.started_at = datetime.utcnow()
                 break
-        await self._save_record(record)
+        await self.save_record(record)
 
     async def _step_done(self, record: MigrationRecord, step_name: str, detail: str) -> None:
         for step in record.steps:
@@ -528,9 +546,9 @@ class TierMigrationService:
                 step.detail = detail
                 step.completed_at = datetime.utcnow()
                 break
-        await self._save_record(record)
+        await self.save_record(record)
 
-    async def _save_record(self, record: MigrationRecord) -> None:
+    async def save_record(self, record: MigrationRecord) -> None:
         """Persist migration record to DB."""
         from sqlalchemy import insert, text
         from app.db.engine import async_session
