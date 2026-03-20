@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import urllib.parse
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -147,8 +148,9 @@ class TierMigrationService:
 
             # Step 3: Copy data (sessions, files, skills)
             await self._step_start(record, "copy_data")
+            shared_url = await self._shared._get_bridge_url()
             await self._copy_all_agents_data(
-                user_id, provisioned, dedicated_url, record
+                user_id, provisioned, shared_url, dedicated_url, record
             )
             await self._step_done(record, "copy_data", "data copied")
 
@@ -252,11 +254,11 @@ class TierMigrationService:
                 dedicated_agents = result.scalars().all()
 
             provisioned = []
-            if dedicated_url and dedicated_agents:
+            if dedicated_agents:
                 async with httpx.AsyncClient(timeout=120.0) as client:
                     for agent in dedicated_agents:
-                        agent_data = await self._dedicated_create_agent(
-                            client, dedicated_url, agent.name, agent.soul_md
+                        agent_data = await self._shared_create_agent(
+                            client, agent.name, agent.soul_md
                         )
                         provisioned.append({
                             "old_id": agent.id,
@@ -268,8 +270,9 @@ class TierMigrationService:
             # Step 2: Copy data
             await self._step_start(record, "copy_data")
             if dedicated_url and provisioned:
+                shared_url = await self._shared._get_bridge_url()
                 await self._copy_all_agents_data(
-                    user_id, provisioned, dedicated_url, record, to_shared=True
+                    user_id, provisioned, dedicated_url, shared_url, record
                 )
             await self._step_done(record, "copy_data", "data copied")
 
@@ -356,53 +359,153 @@ class TierMigrationService:
             )
         return {"id": agent_id, "name": name}
 
+    async def _shared_create_agent(
+        self,
+        client: httpx.AsyncClient,
+        name: str,
+        soul_md: str,
+    ) -> dict[str, Any]:
+        """Create an agent on the shared bridge via _shared adapter."""
+        bridge_url = await self._shared._get_bridge_url()
+        resp = await client.post(
+            f"{bridge_url}/api/agents",
+            json={"name": name},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        agent_id = data.get("id", name)
+
+        if soul_md:
+            await client.put(
+                f"{bridge_url}/api/agents/{agent_id}/files/SOUL.md",
+                json={"content": soul_md},
+            )
+        return {"id": agent_id, "name": name}
+
     async def _copy_all_agents_data(
         self,
         user_id: str,
         agents: list[dict[str, Any]],
-        dedicated_url: str,
+        source_url: str,
+        target_url: str,
         record: MigrationRecord,
-        to_shared: bool = False,
     ) -> None:
-        """Copy sessions, files, and skills for all agents."""
+        """Copy sessions, files, and skills from source backend to target backend.
+
+        Args:
+            source_url: Bridge URL to read data from (shared for upgrade, dedicated for downgrade)
+            target_url: Bridge URL to write data to (dedicated for upgrade, shared for downgrade)
+        """
+        import urllib.parse
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             for item in agents:
                 old_id = item["old_id"]
                 new_oc_id = item["openclaw_agent_id"]
 
-                # Copy sessions
+                # -----------------------------------------------------------------
+                # 1. Sessions — list → GET history → POST messages (deliver=false)
+                # -----------------------------------------------------------------
                 try:
                     resp = await client.get(
-                        f"{dedicated_url}/api/sessions",
+                        f"{source_url}/api/sessions",
                         params={"agentId": old_id},
                     )
                     if resp.status_code == 200:
                         sessions = resp.json()
-                        for sess in sessions:
-                            sk = sess.get("sessionKey", "")
-                            if sk:
-                                # Copy session history
+                        for sess in sessions.get("sessions", sessions) if isinstance(sessions, dict) else sessions:
+                            sk = sess.get("key", "")
+                            if not sk:
+                                continue
+                            # Convert "agent:oldId:sessionKey" → "agent:newId:sessionKey"
+                            old_prefix = f"agent:{old_id}:"
+                            if sk.startswith(old_prefix):
+                                new_sk = f"agent:{new_oc_id}:" + sk[len(old_prefix):]
+                            else:
+                                new_sk = f"agent:{new_oc_id}:{sk}"
+
+                            # Fetch history
+                            try:
+                                # The session detail endpoint uses the raw key
+                                encoded_sk = urllib.parse.quote(sk, safe="")
                                 hist_resp = await client.get(
-                                    f"{dedicated_url}/api/sessions/{sk}/history",
-                                    params={"sessionKey": sk},
+                                    f"{source_url}/api/sessions/{encoded_sk}",
                                 )
                                 if hist_resp.status_code == 200:
-                                    msgs = hist_resp.json()
-                                    # Store in DB or relay to new backend
-                                    pass
+                                    hist_data = hist_resp.json()
+                                    messages = hist_data.get("messages", [])
+                                    # Replay messages to new session (deliver=false = no agent)
+                                    for msg in messages:
+                                        content = msg.get("content", "")
+                                        if content and isinstance(content, str):
+                                            try:
+                                                await client.post(
+                                                    f"{target_url}/api/sessions/{urllib.parse.quote(new_sk, safe='')}/messages",
+                                                    json={"message": content},
+                                                    headers={"X-Agent-Id": new_oc_id, "x-is-admin": "true"},
+                                                )
+                                            except Exception:
+                                                pass  # Individual message replay failures are non-fatal
+                            except Exception as e:
+                                logger.warning("Failed to copy session history %s → %s: %s", sk, new_sk, e)
                 except Exception as e:
                     logger.warning("Failed to copy sessions for agent %s: %s", old_id, e)
 
-                # Copy skills
+                # -----------------------------------------------------------------
+                # 2. Files — list → GET content → PUT to target
+                # -----------------------------------------------------------------
                 try:
-                    resp = await client.get(f"{dedicated_url}/api/skills")
-                    if resp.status_code == 200:
-                        skills = resp.json()
-                        for skill in skills:
-                            await client.post(
-                                f"{dedicated_url}/api/skills/{skill['name']}/copy",
-                            )
+                    file_resp = await client.get(
+                        f"{source_url}/api/agents/{old_id}/files",
+                        params={"path": ""},
+                    )
+                    if file_resp.status_code == 200:
+                        files = file_resp.json()
+                        if isinstance(files, list):
+                            for f in files:
+                                fpath = f.get("path", "")
+                                if not fpath:
+                                    continue
+                                try:
+                                    # Read file content from source
+                                    content_resp = await client.get(
+                                        f"{source_url}/api/agents/{old_id}/files/{fpath}",
+                                    )
+                                    if content_resp.status_code == 200:
+                                        content = content_resp.content
+                                        # Write to target
+                                        await client.put(
+                                            f"{target_url}/api/agents/{new_oc_id}/files/{fpath}",
+                                            json={"content": content.decode("utf-8", errors="replace")},
+                                            headers={"X-Agent-Id": new_oc_id, "x-is-admin": "true"},
+                                        )
+                                except Exception as e:
+                                    logger.warning("Failed to copy file %s for agent %s: %s", fpath, old_id, e)
+                except Exception as e:
+                    logger.warning("Failed to copy files for agent %s: %s", old_id, e)
+
+                # -----------------------------------------------------------------
+                # 3. Skills — list installed → copy to target
+                # -----------------------------------------------------------------
+                try:
+                    skills_resp = await client.get(
+                        f"{source_url}/api/skills",
+                        headers={"X-Agent-Id": old_id},
+                    )
+                    if skills_resp.status_code == 200:
+                        skills = skills_resp.json()
+                        if isinstance(skills, list):
+                            for skill in skills:
+                                skill_name = skill.get("name", "")
+                                if not skill_name:
+                                    continue
+                                try:
+                                    await client.post(
+                                        f"{target_url}/api/skills/{skill_name}/copy",
+                                        headers={"X-Agent-Id": new_oc_id, "x-is-admin": "true"},
+                                    )
+                                except Exception as e:
+                                    logger.warning("Failed to copy skill %s for agent %s: %s", skill_name, old_id, e)
                 except Exception as e:
                     logger.warning("Failed to copy skills for agent %s: %s", old_id, e)
 

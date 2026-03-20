@@ -1202,18 +1202,21 @@ class ClaudeCodeAdapter(IAgentCore):
 
 ```
 platform/app/
-├── agentcore/                      # NEW: 核心抽象层 (避开了 stdlib `platform` 冲突)
+├── agentcore/                      # 核心抽象层
 │   ├── __init__.py
 │   ├── interfaces.py              # IAgentCore 接口定义
 │   ├── router.py                   # AgentCoreRouter
+│   ├── migration.py                # TierMigrationService (Phase 3)
 │   ├── adapters/                   # Adapter 实现
 │   │   ├── __init__.py
 │   │   ├── shared.py             # SharedOpenClawAdapter
-│   │   └── dedicated.py           # DedicatedOpenClawAdapter (Phase 2)
+│   │   └── dedicated.py           # DedicatedOpenClawAdapter
 │   └── config/
 │       ├── __init__.py
 │       ├── tiers.py               # TierConfigManager
 │       └── tiers.yaml             # Tier 配置
+├── container/
+│   └── dedicated_manager.py       # DedicatedContainerManager (Phase 2)
 └── ...existing routes unchanged...
 ```
 
@@ -1244,15 +1247,20 @@ platform/app/
 - [x] `DedicatedContainerManager` 接入 lifespan（idle checker 随 app 启动/关闭）
 - [x] DB migration：`dedicated_containers` 表（auto on startup）
 - [x] `AgentCoreRouter` tier 路由（free/basic → shared, pro/enterprise → dedicated）
-- [ ] LLM Proxy 支持 container_token 认证（container_token 已在 DB，proxy 层待接入）
+- [x] LLM Proxy 支持 container_token 认证（DedicatedContainerManager.generate token → env 注入 → LLM proxy DB 验证）
 - [ ] **验证**：Pro 用户有独立容器
 
 ### Phase 3: 数据迁移
 
-- [ ] Free → Pro 迁移流程
-- [ ] Pro → Free 降级流程
-- [ ] 迁移过程的用户体验（进度条/通知）
-- [ ] **验证**：迁移后数据完整
+### Phase 3: 数据迁移 — 🔄 PARTIAL
+
+- [x] `TierMigrationService`：upgrade + downgrade 核心流程
+- [x] 6 步骤：容器/agent 创建 → 数据复制 → 路由更新 → tier 更新 → 容器销毁（downgrade） → 通知
+- [x] `MigrationRecord` 每步状态追踪
+- [x] Admin endpoints：`POST /admin/users/{id}/migrate`、`GET /admin/migrations/{id}`
+- [x] DB migration：`tier_migrations` 表
+- [x] **完整数据复制**：sessions（replay messages via `deliver=false`） + files（PUT endpoint）+ skills（`/copy` endpoint）跨 backend 同步
+- [ ] 迁移进度条前端展示
 
 ### Phase 4: 生产化
 
@@ -1266,6 +1274,13 @@ platform/app/
 - [ ] Claude Code Adapter 接口实现
 - [ ] Tier 配置支持 `agent_core` 字段
 - [ ] **验证**：Claude Code tier 可用
+
+### Phase 6: NanoBot / NanoClaw Adapter（未来）
+
+- [ ] 调研 NanoBot / NanoClaw Agent Core 架构与 API 接口
+- [ ] 实现 `NanoBotAdapter(IAgentCore)` 适配器
+- [ ] Tier 配置支持 `nanobot` backend type
+- [ ] **验证**：NanoBot tier 可用
 
 ---
 

@@ -128,7 +128,6 @@ class DedicatedOpenClawAdapter(IAgentCore):
         if info.container_token:
             self.set_token(info.container_token)
         return info.bridge_url
-        return info.bridge_url
 
     def _normalize_event(self, raw: dict[str, Any]) -> CoreEvent:
         """Convert bridge WS event to normalized CoreEvent."""
@@ -159,7 +158,7 @@ class DedicatedOpenClawAdapter(IAgentCore):
     async def create_agent(self, config: AgentConfig) -> str:
         """Create an agent on the user's dedicated OpenClaw instance."""
         # Ensure container is running first
-        tier = self._cm._tier_config_for_user(self.user_id)  # type: ignore
+        tier = await self._cm._tier_config_for_user(self.user_id)
         await self._cm.ensure_running(self.user_id, tier)
 
         bridge_url = await self._get_bridge_url()

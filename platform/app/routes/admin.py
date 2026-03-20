@@ -338,6 +338,7 @@ class MigrationStatusResponse(BaseModel):
     error: str | None = None
     created_at: datetime
     completed_at: datetime | None = None
+    steps: list[dict[str, str]] = []
 
 
 @router.post("/users/{user_id}/migrate", response_model=MigrationStatusResponse)
@@ -419,6 +420,14 @@ async def get_migration_status(migration_id: str, db: AsyncSession = Depends(get
     row = result.mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail="Migration not found")
+    import json
+    steps_raw = row.get("steps")
+    steps: list[dict[str, str]] = []
+    if steps_raw:
+        try:
+            steps = json.loads(steps_raw)
+        except Exception:
+            pass
     return MigrationStatusResponse(
         id=row["id"],
         user_id=row["user_id"],
@@ -429,6 +438,7 @@ async def get_migration_status(migration_id: str, db: AsyncSession = Depends(get
         error=row.get("error"),
         created_at=row["created_at"],
         completed_at=row.get("completed_at"),
+        steps=steps,
     )
 
 
@@ -442,8 +452,16 @@ async def list_user_migrations(user_id: str, db: AsyncSession = Depends(get_db))
         {"uid": user_id},
     )
     rows = result.mappings().all()
-    return [
-        MigrationStatusResponse(
+    import json
+    def _parse_row(row):
+        steps_raw = row.get("steps")
+        steps: list[dict[str, str]] = []
+        if steps_raw:
+            try:
+                steps = json.loads(steps_raw)
+            except Exception:
+                pass
+        return MigrationStatusResponse(
             id=row["id"],
             user_id=row["user_id"],
             direction=row["direction"],
@@ -453,6 +471,6 @@ async def list_user_migrations(user_id: str, db: AsyncSession = Depends(get_db))
             error=row.get("error"),
             created_at=row["created_at"],
             completed_at=row.get("completed_at"),
+            steps=steps,
         )
-        for row in rows
-    ]
+    return [_parse_row(row) for row in rows]

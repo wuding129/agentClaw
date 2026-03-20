@@ -135,20 +135,14 @@ class AgentCoreRouter:
         """Get the tier configuration by name."""
         return self._tier_config.get_tier(tier_name)
 
-    def get_user_tier_config(self, user_id: str) -> TierConfig:
+    async def get_user_tier_config(self, user_id: str) -> TierConfig:
         """Get the tier configuration for a user."""
-        import asyncio
-        tier_name = asyncio.get_event_loop().run_until_complete(
-            self._get_user_tier(user_id)
-        )
+        tier_name = await self._get_user_tier(user_id)
         return self._tier_config.get_tier(tier_name)
 
-    def is_feature_enabled(self, user_id: str, feature: str) -> bool:
+    async def is_feature_enabled(self, user_id: str, feature: str) -> bool:
         """Check if a feature is enabled for a user based on their tier."""
-        import asyncio
-        tier_name = asyncio.get_event_loop().run_until_complete(
-            self._get_user_tier(user_id)
-        )
+        tier_name = await self._get_user_tier(user_id)
         return self._tier_config.is_feature_enabled(tier_name, feature)
 
     # -------------------------------------------------------------------------
